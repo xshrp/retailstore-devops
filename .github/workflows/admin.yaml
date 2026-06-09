@@ -7,12 +7,12 @@ on:
     workflow_dispatch:
         inputs:
             environment:
-                description: "Entorno a desplegar (dev/test/prod)"
+                description: "Entorno a desplegar (develop/test/prod)"
                 required: true
-                default: "dev"
+                default: "develop"
                 type: choice
                 options:
-                    - dev
+                    - develop
                     - test
                     - prod
 
