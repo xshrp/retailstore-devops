@@ -1,0 +1,22 @@
+name: App
+on:
+    push:
+        branches: ["main", "develop"]
+        paths:
+            - 'src/admin/**'
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: "Entorno a desplegar (dev/test/prod)"
+                required: true
+                default: "dev"
+                type: choice
+                options:
+                    - dev
+                    - test
+                    - prod
+
+jobs:
+  terraform:
+    name: Base de Actions
+    runs-on: ubuntu-latest
