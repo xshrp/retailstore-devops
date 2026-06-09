@@ -5,16 +5,20 @@ on:
     branches: ["main", "develop"]
     paths:
       - 'src/checkout/**'
+  pull_request:
+    branches: ["main", "develop"]
+    paths:
+      - 'src/checkout/**'
   workflow_dispatch:
     inputs:
       environment:
-        description: "Entorno a desplegar (dev/staging/prod)"
+        description: "Entorno a desplegar (develop/test/prod)"
         required: true
-        default: "dev"
+        default: "develop"
         type: choice
         options:
-          - dev
-          - staging
+          - develop
+          - test
           - prod
 
 permissions:
@@ -109,10 +113,10 @@ jobs:
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref_name }}" = "main" ]; then
             echo "environment=prod" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref_name }}" = "staging" ]; then
-            echo "environment=staging" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_name }}" = "test" ]; then
+            echo "environment=test" >> $GITHUB_OUTPUT
           else
-            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "environment=develop" >> $GITHUB_OUTPUT
           fi
 
       - name: Configure AWS credentials
