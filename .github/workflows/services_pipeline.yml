@@ -1,14 +1,14 @@
-name: Orders CI/CD
+name: Admin CI/CD
 
 on:
   push:
     branches: ["main", "develop"]
     paths:
-      - 'src/orders/**'
+      - 'src/**'
   pull_request:
     branches: ["main", "develop"]
     paths:
-      - 'src/orders/**'
+      - 'src/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -20,6 +20,24 @@ on:
           - develop
           - test
           - prod
+      service_path:
+        description: 'Ruta relativa del microservicio (ej: src/admin)'
+        required: false
+        default: 'src/admin'
+      service_name:
+        description: 'Nombre simple del servicio (ej: admin)'
+        required: false
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        type: string
+      service_path:
+        required: false
+        type: string
+      service_name:
+        required: false
+        type: string
 
 permissions:
   security-events: write
@@ -30,6 +48,8 @@ jobs:
   code-scan:
     name: Code Scan (Semgrep)
     runs-on: ubuntu-latest
+    env:
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     container:
       image: semgrep/semgrep
     steps:
@@ -42,7 +62,7 @@ jobs:
             --config=auto \
             --sarif \
             --output=semgrep-results.sarif \
-            ./src/orders
+            ${{ env.SERVICE_PATH }}
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
@@ -56,11 +76,13 @@ jobs:
     name: Quality Gate (SonarCloud)
     runs-on: ubuntu-latest
     needs: code-scan
+    env:
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0   
 
       - name: Análisis SonarCloud
         uses: SonarSource/sonarcloud-github-action@master
@@ -72,6 +94,8 @@ jobs:
     name: Software Composition Analysis (Trivy filesystem)
     runs-on: ubuntu-latest
     needs: code-scan
+    env:
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,7 +104,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
-          scan-targets: ./src/orders
+          scan-targets: ${{ env.SERVICE_PATH }}
           format: sarif
           output: trivy-sca-results.sarif
           severity: CRITICAL,HIGH
@@ -94,11 +118,13 @@ jobs:
           sarif_file: trivy-sca-results.sarif
 
   build-and-push:
-    name: Build & Push Orders Image to ECR
+    name: Build & Push Admin Image to ECR
     runs-on: ubuntu-latest
     needs: [code-scan, sonar-quality, sca-scan]
     env:
       AWS_REGION: us-east-1
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+      SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
     outputs:
       image_uri: ${{ steps.build.outputs.image_uri }}
       environment: ${{ steps.set-env.outputs.environment }}
@@ -119,6 +145,12 @@ jobs:
             echo "environment=develop" >> $GITHUB_OUTPUT
           fi
 
+      - name: Derivar nombre de servicio (si no provisto)
+        if: ${{ !inputs.service_name && !github.event.inputs.service_name }}
+        run: |
+          basename=$(basename "${{ env.SERVICE_PATH }}")
+          echo "SERVICE_NAME=$basename" >> $GITHUB_ENV
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -136,7 +168,7 @@ jobs:
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ENV: ${{ steps.set-env.outputs.environment }}
-          ECR_REPO: orders-service-${{ steps.set-env.outputs.environment }}
+          ECR_REPO: ${{ env.SERVICE_NAME }}-service-${{ steps.set-env.outputs.environment }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI="$REGISTRY/$ECR_REPO:$IMAGE_TAG"
@@ -147,7 +179,7 @@ jobs:
             --label "build.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             -t "$IMAGE_URI" \
             -t "$REGISTRY/$ECR_REPO:latest" \
-            ./src/orders
+            ${{ env.SERVICE_PATH }}
 
           docker push "$IMAGE_URI"
           docker push "$REGISTRY/$ECR_REPO:latest"
@@ -160,6 +192,8 @@ jobs:
     needs: build-and-push
     env:
       AWS_REGION: us-east-1
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+      SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -192,11 +226,13 @@ jobs:
           sarif_file: trivy-results.sarif
 
   deploy:
-    name: Deploy Orders Service to ECS
+    name: Deploy Admin Service to ECS
     runs-on: ubuntu-latest
     needs: [build-and-push, image-scan]
     env:
       AWS_REGION: us-east-1
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+      SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
     environment:
       name: ${{ needs.build-and-push.outputs.environment }}
     steps:
@@ -217,9 +253,9 @@ jobs:
           ENV: ${{ needs.build-and-push.outputs.environment }}
           IMAGE_URI: ${{ needs.build-and-push.outputs.image_uri }}
           ECS_CLUSTER: ecs-cluster-${{ needs.build-and-push.outputs.environment }}
-          ECS_SERVICE: orders-service-${{ needs.build-and-push.outputs.environment }}
-          ECS_TASK_FAMILY: orders-service-${{ needs.build-and-push.outputs.environment }}
-          CONTAINER_NAME: orders-service
+          ECS_SERVICE: ${{ env.SERVICE_NAME }}-service-${{ needs.build-and-push.outputs.environment }}
+          ECS_TASK_FAMILY: ${{ env.SERVICE_NAME }}-service-${{ needs.build-and-push.outputs.environment }}
+          CONTAINER_NAME: ${{ env.SERVICE_NAME }}-service
         run: |
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \
