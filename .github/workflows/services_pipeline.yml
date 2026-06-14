@@ -50,21 +50,21 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
-    container:
-      image: semgrep/semgrep
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run Semgrep
         run: |
-          semgrep scan \
+          docker run --rm \
+            -v "$(pwd):/src" \
+            -e SEMGREP_APP_TOKEN="${{ secrets.SEMGREP_APP_TOKEN }}" \
+            semgrep/semgrep \
+            semgrep scan \
             --config=auto \
             --sarif \
-            --output=semgrep-results.sarif \
-            ${{ env.SERVICE_PATH }}
-        env:
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+            --output=/src/semgrep-results.sarif \
+            /src/${{ env.SERVICE_PATH }}
 
       - name: Upload Semgrep SARIF
         uses: github/codeql-action/upload-sarif@v3
