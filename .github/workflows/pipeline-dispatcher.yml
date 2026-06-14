@@ -16,6 +16,10 @@ on:
           - orders
           - ui
 
+permissions:
+  security-events: write
+  contents: read
+  id-token: write
 
 jobs:
   resolve-matrix:
