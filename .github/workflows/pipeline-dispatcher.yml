@@ -2,7 +2,15 @@ name: pipeline-dispatcher - Invoke Service Pipeline
 
 on:
   push:
-    branches: ["main", "develop"]
+    branches:
+      - main
+      - develop
+      - admin
+      - cart
+      - catalog
+      - checkout
+      - orders
+      - ui
     paths: ['src/**', '.github/workflows/**']
 
   pull_request:
@@ -34,10 +42,16 @@ jobs:
       - id: set-matrix
         run: |
           INPUT="${{ github.event.inputs.service_name }}"
+          BRANCH="${GITHUB_REF#refs/heads/}"
 
-          # Si hay input, solo ese servicio; si no, todos
+          # Si hay input, solo ese servicio
           if [ -n "$INPUT" ]; then
             MATRIX=$(echo '[{"service_name":"'$INPUT'","service_path":"src/'$INPUT'"}]')
+
+          # Si la rama coincide con un servicio, usar ese servicio
+          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "cart" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
+            MATRIX=$(echo '[{"service_name":"'$BRANCH'","service_path":"src/'$BRANCH'"}]')
+
           else
             MATRIX='[
               {"service_name":"admin",    "service_path":"src/admin"},
