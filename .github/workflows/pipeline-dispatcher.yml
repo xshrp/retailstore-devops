@@ -1,5 +1,10 @@
 name: pipeline-dispatcher - Invoke Service Pipeline
 
+permissions:
+  security-events: write
+  contents: read
+  id-token: write
+
 on:
   push:
     branches:
