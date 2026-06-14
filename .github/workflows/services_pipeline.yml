@@ -165,29 +165,29 @@ jobs:
 
       - name: Fail on CRITICAL/HIGH vulnerabilities without fix
         run: |
-          python3 - <<'PY'
-import json,sys
-try:
-    data = json.load(open('trivy-sca-results.json'))
-except Exception as e:
-    print('Could not read trivy-sca-results.json:', e)
-    sys.exit(1)
-
-found = False
-for result in data.get('Results', []):
-    for vuln in result.get('Vulnerabilities', []) or []:
-        sev = vuln.get('Severity', '').upper()
-        if sev in ('CRITICAL','HIGH'):
-            fixed = vuln.get('FixedVersion') or ''
-            if not fixed.strip():
-                print(f"BLOCKING: {vuln.get('VulnerabilityID')} {vuln.get('PkgName')} {sev} (no fix)")
-                found = True
-
-if found:
-    sys.exit(1)
-else:
-    print('No blocking unpatched CRITICAL/HIGH vulnerabilities found')
-PY
+          python3 << 'EOF'
+          import json,sys
+          try:
+              data = json.load(open('trivy-sca-results.json'))
+          except Exception as e:
+              print('Could not read trivy-sca-results.json:', e)
+              sys.exit(1)
+          
+          found = False
+          for result in data.get('Results', []):
+              for vuln in result.get('Vulnerabilities', []) or []:
+                  sev = vuln.get('Severity', '').upper()
+                  if sev in ('CRITICAL','HIGH'):
+                      fixed = vuln.get('FixedVersion') or ''
+                      if not fixed.strip():
+                          print(f"BLOCKING: {vuln.get('VulnerabilityID')} {vuln.get('PkgName')} {sev} (no fix)")
+                          found = True
+          
+          if found:
+              sys.exit(1)
+          else:
+              print('No blocking unpatched CRITICAL/HIGH vulnerabilities found')
+          EOF
 
       - name: Upload Trivy SCA SARIF
         uses: github/codeql-action/upload-sarif@v3
