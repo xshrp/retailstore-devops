@@ -99,10 +99,11 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SERVICE_PATH: ${{ env.SERVICE_PATH }}
+          SONAR_ORG: ${{ secrets.SONAR_ORG }}
           PROJECT_KEY: ${{ steps.set-project-key.outputs.project_key }}
         run: |
-          if [ -z "$SONAR_HOST_URL" ] || [ -z "$SONAR_TOKEN" ]; then
-            echo "Missing SONAR_HOST_URL or SONAR_TOKEN secrets" >&2
+          if [ -z "$SONAR_HOST_URL" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_ORG" ]; then
+            echo "Missing SONAR_HOST_URL, SONAR_TOKEN or SONAR_ORG secrets" >&2
             exit 1
           fi
 
@@ -113,6 +114,7 @@ jobs:
             sonarsource/sonar-scanner-cli \
             -Dsonar.projectKey="$PROJECT_KEY" \
             -Dsonar.sources="$SERVICE_PATH" \
+            -Dsonar.organization="$SONAR_ORG"
 
       - name: Check SonarQube Quality Gate
         env:
