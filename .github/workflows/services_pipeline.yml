@@ -113,8 +113,6 @@ jobs:
             sonarsource/sonar-scanner-cli \
             -Dsonar.projectKey="$PROJECT_KEY" \
             -Dsonar.sources="$SERVICE_PATH" \
-            -Dsonar.host.url="$SONAR_HOST_URL" \
-            -Dsonar.token="$SONAR_TOKEN"
 
       - name: Check SonarQube Quality Gate
         env:
