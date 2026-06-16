@@ -84,23 +84,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set Sonar project key
-        id: set-project-key
-        run: |
-          if [ -n "${{ env.SERVICE_NAME }}" ]; then
-            echo "project_key=${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
-          else
-            basename=$(basename "${{ env.SERVICE_PATH }}")
-            echo "project_key=$basename" >> $GITHUB_OUTPUT
-          fi
-
       - name: SonarQube analysis (sonar-scanner)
         env:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SERVICE_PATH: ${{ env.SERVICE_PATH }}
           SONAR_ORG: ${{ secrets.SONAR_ORG }}
-          PROJECT_KEY: ${{ steps.set-project-key.outputs.project_key }}
+          PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
         run: |
           if [ -z "$SONAR_HOST_URL" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_ORG" ]; then
             echo "Missing SONAR_HOST_URL, SONAR_TOKEN or SONAR_ORG secrets" >&2
