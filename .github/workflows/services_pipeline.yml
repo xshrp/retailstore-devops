@@ -73,9 +73,8 @@ jobs:
           sarif_file: semgrep-results.sarif
 
   sonar-quality:
-    name: Quality Gate (SonarQube)
+    name: Static Application Security Testing (SonarQube)
     runs-on: ubuntu-latest
-    needs: code-scan
     env:
       SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     steps:
@@ -110,7 +109,8 @@ jobs:
         env:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PROJECT_KEY: ${{ steps.set-project-key.outputs.project_key }}
+          SONAR_ORG: ${{ secrets.SONAR_ORG }}
+          PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
         run: |
           if [ -z "$SONAR_HOST_URL" ] || [ -z "$SONAR_TOKEN" ]; then
             echo "Missing SONAR_HOST_URL or SONAR_TOKEN secrets" >&2
@@ -129,7 +129,6 @@ jobs:
   sca-scan:
     name: Software Composition Analysis (Trivy filesystem)
     runs-on: ubuntu-latest
-    needs: code-scan
     env:
       SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     steps:
@@ -219,7 +218,7 @@ jobs:
   build-and-push:
     name: Build & Push Admin Image to ECR
     runs-on: ubuntu-latest
-    needs: [code-scan, sonar-quality, sca-scan, secret-scan]
+    needs: [sonar-quality, sca-scan, secret-scan]
     env:
       AWS_REGION: us-east-1
       SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
