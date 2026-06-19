@@ -37,6 +37,15 @@ on:
           - orders
           - ui
 
+      environment:
+        description: 'Ambiente a desplegar'
+        required: true
+        type: choice
+        options:
+          - Dev
+          - Test
+          - Prod
+
 
 jobs:
   resolve-matrix:
@@ -72,6 +81,7 @@ jobs:
           echo "matrix=$(echo $MATRIX | jq -c .)" >> $GITHUB_OUTPUT
 
   call-service:
+    name: LLamar Pipeline de Servicio
     needs: resolve-matrix
     strategy:
       fail-fast: false
@@ -82,4 +92,33 @@ jobs:
     with:
       service_path: ${{ matrix.service_path }}
       service_name: ${{ matrix.service_name }}
+    secrets: inherit
+
+  configure-infra:
+    name: Configurar Infraestructura
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verifica environment seleccionado
+        run: |
+          ENV="${{ inputs.environment }}"
+          echo "Environment seleccionado: $ENV"
+
+          case "$ENV" in
+            dev|test|prod)
+              echo "TFVARS_FILE=terraform/envs/${ENV}.tfvars" >> $GITHUB_ENV
+              echo "Using tfvars: terraform/envs/${ENV}.tfvars"
+              ;;
+            *)
+              echo "Invalid environment: $ENV. Debe ser dev, test o prod" >&2
+              exit 1
+              ;;
+          esac
+
+  call-infra:
+    name: Llamar Pipeline de Infraestructura 
+    needs: configure-infra
+    uses: ./.github/workflows/infra.yml
+    with:
+      environment: ${{ inputs.environment }}
+      tfvars_file: terraform/envs/${{ inputs.environment }}.tfvars
     secrets: inherit
