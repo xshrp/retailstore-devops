@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: retailstore
+type: Opaque
+stringData:
+  POSTGRES_USER: retail_user
+  POSTGRES_PASSWORD: retailpassword
+
+# Configuracion para inicializar la db en k8s
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  namespace: retailstore
+data:
+  init.sql: |
+    CREATE DATABASE catalogdb;
+    CREATE DATABASE cartdb;
+
+    GRANT ALL PRIVILEGES ON DATABASE catalogdb TO retail_user;
+    GRANT ALL PRIVILEGES ON DATABASE cartdb TO retail_user;
+    GRANT ALL PRIVILEGES ON DATABASE orders TO retail_user;
+
+    \c orders
+    GRANT ALL ON SCHEMA public TO retail_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO retail_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO retail_user;
+
+    \c catalogdb
+    GRANT ALL ON SCHEMA public TO retail_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO retail_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO retail_user;
+
+    \c cartdb
+    GRANT ALL ON SCHEMA public TO retail_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO retail_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO retail_user;
+
+    CREATE TABLE cart_items (
+        customer_id VARCHAR(255) NOT NULL,
+        item_id     VARCHAR(255) NOT NULL,
+        quantity    INTEGER      NOT NULL,
+        unit_price  INTEGER      NOT NULL,
+        PRIMARY KEY (customer_id, item_id)
+    );
+
+# Claim para que no se nos mueran los datos si eliminamos el pod
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: retailstore
+spec:
+  accessModes:
+    - ReadWriteOnce
+
+  resources:
+    requests:
+      storage: 10Gi
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: retailstore
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: postgres
+
+  template:
+    metadata:
+      labels:
+        app: postgres
+
+    spec:
+      containers:
+        - name: postgres
+
+          image: postgres:16
+
+          ports:
+            - containerPort: 5432
+
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+
+            - name: POSTGRES_DB
+              value: orders
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d
+
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+        - name: init-script
+          configMap:
+            name: postgres-init-script

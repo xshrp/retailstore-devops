@@ -1,0 +1,111 @@
+# UI service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui
+  namespace: retailstore
+spec:
+  type: LoadBalancer
+  selector:
+    app: ui
+  ports:
+    - port: 80
+      targetPort: 8080
+
+# ADMIN service
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  namespace: retailstore
+spec:
+  type: LoadBalancer
+  selector:
+    app: admin
+  ports:
+    - port: 80
+      targetPort: 8080
+
+# POSTGRES service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: retailstore
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+# REDIS service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: retailstore
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+  type: ClusterIP
+
+# CATALOG service
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog
+  namespace: retailstore
+spec:
+  selector:
+    app: catalog
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+# CART service
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart
+  namespace: retailstore
+spec:
+  selector:
+    app: cart
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+# ORDERS service
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders
+  namespace: retailstore
+spec:
+  selector:
+    app: orders
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+# CHECKOUT service
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout
+  namespace: retailstore
+spec:
+  selector:
+    app: checkout
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

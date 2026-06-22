@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: retailstore
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: checkout
+
+  template:
+    metadata:
+      labels:
+        app: checkout
+
+    spec:
+      containers:
+        - name: checkout
+
+          image: TODO : REEEMPLAZAR POR IMAGEN/checkout:latest
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: RETAIL_CHECKOUT_PERSISTENCE_PROVIDER
+              value: redis
+
+            - name: RETAIL_CHECKOUT_PERSISTENCE_REDIS_URL
+              value: redis://redis:6379
+
+            - name: RETAIL_CHECKOUT_ENDPOINTS_ORDERS
+              value: http://orders:8080
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10

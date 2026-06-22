@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog
+  namespace: retailstore
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: catalog
+
+  template:
+    metadata:
+      labels:
+        app: catalog
+
+    spec:
+      containers:
+        - name: catalog
+
+          image: TODO : REEEMPLAZAR POR IMAGEN/catalog:latest
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: GIN_MODE
+              value: release
+
+            - name: RETAIL_CATALOG_PERSISTENCE_PROVIDER
+              value: postgres
+
+            - name: RETAIL_CATALOG_PERSISTENCE_ENDPOINT
+              value: postgres:5432
+
+            - name: RETAIL_CATALOG_PERSISTENCE_DB_NAME
+              value: catalogdb
+
+            - name: RETAIL_CATALOG_PERSISTENCE_USER
+              value: retail_user
+
+            - name: RETAIL_CATALOG_PERSISTENCE_PASSWORD
+              value: retailpassword
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10

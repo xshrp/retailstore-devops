@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin
+  namespace: retailstore
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: admin
+
+  template:
+    metadata:
+      labels:
+        app: admin
+
+    spec:
+      containers:
+        - name: admin
+          image: TODO : REEEMPLAZAR POR IMAGEN/admin:latest 
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: DB_HOST
+              value: postgres
+
+            - name: DB_PORT
+              value: "5432"
+
+            - name: DB_USER
+              value: retail_user
+
+            - name: DB_PASSWORD
+              value: retailpassword
+
+            - name: ADMIN_USERNAME
+              value: admin
+
+            - name: ADMIN_PASSWORD
+              value: admin
+
+            - name: ADMIN_JWT_SECRET
+              value: change-me-in-production
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
