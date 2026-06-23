@@ -19,7 +19,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN  }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Instalacion de terraform
@@ -40,6 +40,7 @@ jobs:
       - name: Terraform Apply
         working-directory: ./infra/terraform/environments/develop
         run: terraform apply -auto-approve
+
 
   deploy:
     needs: terraform
@@ -64,19 +65,41 @@ jobs:
       - name: Instalacion de kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: Configuracion de acceso al cluster EKS
+      - name: Configurar kubeconfig de EKS
         run: |
           aws eks update-kubeconfig \
             --region $AWS_REGION \
             --name $CLUSTER_NAME
 
-      - name: Otorgar permisos al script de deploy
-        run: chmod +x infra/scripts/deploy-dev.sh
+      - name: Esperar que el nodegroup este activo
+        run: |
+          aws eks wait nodegroup-active \
+            --cluster-name $CLUSTER_NAME \
+            --nodegroup-name retailstore-develop-ng
 
-      - name: Deploy de la aplicacion mediante script
+      - name: Esperar que los nodos esten listos
+        run: |
+          echo "Esperando nodos..."
+          kubectl wait --for=condition=Ready nodes --all --timeout=600s
+
+      - name: Instalar NGINX Ingress Controller
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+
+      - name: Esperar que Ingress Controller de NGINX este listo
+        run: |
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=300s
+
+      - name: Dar permisos al script de deploy
+        run: chmod +x ./infra/scripts/deploy-dev.sh
+
+      - name: Ejecutar deploy de Kubernetes
         run: ./infra/scripts/deploy-dev.sh
 
-      - name: Estado del cluster
+      - name: Estado del cluster (debug)
         if: always()
         run: |
           kubectl get nodes
