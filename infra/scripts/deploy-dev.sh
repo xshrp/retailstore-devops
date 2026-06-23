@@ -20,6 +20,20 @@ echo "Esperando 2 segundos para reducir la presion del cluster..."
 sleep 2
 
 echo ""
+echo "Storage Class"
+kubectl apply -f "$BASE_DIR/infra/k8s/base/storage_gp3.yaml"    
+kubectl get sc
+echo "Validando gp3..."
+echo "Validando StorageClass gp3..."
+for i in {1..10}; do
+  kubectl get sc gp3 && break
+  echo "Esperando gp3..."
+  sleep 2
+done
+echo "Esperando 2 segundos para reducir la presion del cluster..."
+sleep 2
+
+echo ""
 echo "Redis"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/redis.yaml"
 echo "Esperando 5 segundos para reducir la presion del cluster..."
