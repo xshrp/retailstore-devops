@@ -19,7 +19,7 @@ spec:
       containers:
         - name: checkout
 
-          image: TODO : REEEMPLAZAR POR IMAGEN/checkout:latest
+          image: xshrp/retailstore-checkout:latest
 
           ports:
             - containerPort: 8080

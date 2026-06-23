@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: admin
-          image: TODO : REEEMPLAZAR POR IMAGEN/admin:latest 
+          image: xshrp/retailstore-admin:latest
 
           ports:
             - containerPort: 8080

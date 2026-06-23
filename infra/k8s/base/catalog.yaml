@@ -19,7 +19,7 @@ spec:
       containers:
         - name: catalog
 
-          image: TODO : REEEMPLAZAR POR IMAGEN/catalog:latest
+          image: xshrp/retailstore-catalog:latest
 
           ports:
             - containerPort: 8080

@@ -19,7 +19,7 @@ spec:
       containers:
         - name: cart
 
-          image: TODO : REEEMPLAZAR POR IMAGEN/cart:latest
+          image: xshrp/retailstore-carts:latest
 
           ports:
             - containerPort: 8080
