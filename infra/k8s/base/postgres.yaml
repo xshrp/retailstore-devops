@@ -7,7 +7,7 @@ type: Opaque
 stringData:
   POSTGRES_USER: retail_user
   POSTGRES_PASSWORD: retailpassword
-
+---
 # Configuracion para inicializar la db en k8s
 apiVersion: v1
 kind: ConfigMap
@@ -45,7 +45,7 @@ data:
         unit_price  INTEGER      NOT NULL,
         PRIMARY KEY (customer_id, item_id)
     );
-
+---
 # Claim para que no se nos mueran los datos si eliminamos el pod
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -59,7 +59,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
