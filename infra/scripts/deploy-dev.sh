@@ -8,48 +8,77 @@ echo "----------------------------------------"
 echo "Iniciando deploy en el cluster 'develop'"
 echo "----------------------------------------"
 
-echo "Namespace (1/11)"
+echo "Namespace"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/namespace.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo ""
-echo "Redis (2/11)"
-kubectl apply -f "$BASE_DIR/infra/k8s/base/redis.yaml"
-
-echo ""
-echo "Postgres (3/11)"
-kubectl apply -f "$BASE_DIR/infra/k8s/base/postgres.yaml"
-
-echo ""
-echo "Servicios (4/11)"
+echo "Servicios (Networking)"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/services.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo ""
-echo "Catalog (5/11)"
+echo "Redis"
+kubectl apply -f "$BASE_DIR/infra/k8s/base/redis.yaml"
+echo "Esperando 10 segundos para reducir la presion del cluster..."
+sleep 10
+
+echo ""
+echo "Postgres"
+kubectl apply -f "$BASE_DIR/infra/k8s/base/postgres.yaml"
+echo "Esperando 20 segundos para reducir la presion del cluster..."
+sleep 20
+
+echo ""
+echo "Esperando DBs estabilizarse..."
+kubectl wait --for=condition=ready pod -l app=redis -n retailstore --timeout=120s || true
+kubectl wait --for=condition=ready pod -l app=postgres -n retailstore --timeout=120s || true
+echo "Esperando 10 segundos para reducir la presion del cluster..."
+sleep 10
+
+echo ""
+echo "Catalog"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/catalog.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo ""
-echo "Cart (6/11)"
+echo "Cart"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/cart.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo ""
-echo "Orders (7/11)"
+echo "Orders"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/orders.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo ""
-echo "Checkout (8/11)"
+echo "Checkout"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/checkout.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo ""
-echo "UI (9/11)"
+echo "UI"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/ui.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo ""
-echo "Admin (10/11)"
+echo "Admin"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/admin.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo ""
-echo "Ingress (11/11)"
+echo "Ingress"
 kubectl apply -f "$BASE_DIR/infra/k8s/base/ingress.yaml"
+echo "Esperando 5 segundos para reducir la presion del cluster..."
+sleep 5
 
 echo "----------------------------------------"
 echo "Deploy de 'develop' finalizado"
