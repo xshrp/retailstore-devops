@@ -11,4 +11,4 @@ private_subnets = ["10.0.3.0/24","10.0.4.0/24"]
 
 azs = ["us-east-1a","us-east-1b"]
 
-node_instance_type = "t3.small"
+node_instance_type = "t3.micro"

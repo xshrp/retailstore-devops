@@ -5,7 +5,7 @@ metadata:
   name: ui
   namespace: retailstore
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: ui
   ports:
@@ -19,7 +19,7 @@ metadata:
   name: admin
   namespace: retailstore
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: admin
   ports:

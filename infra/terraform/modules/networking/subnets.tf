@@ -11,7 +11,9 @@ resource "aws_subnet" "public" {
     App                      = var.app_name
     Environment              = var.environment
     Type                     = "public"
+    
     "kubernetes.io/role/elb" = "1"
+    "kubernetes.io/cluster/${var.app_name}-${var.environment}-eks" = "shared"
   }
 }
 
@@ -27,6 +29,8 @@ resource "aws_subnet" "private" {
     App                               = var.app_name
     Environment                       = var.environment
     Type                              = "private"
+
     "kubernetes.io/role/internal-elb" = "1"
+    "kubernetes.io/cluster/${var.app_name}-${var.environment}-eks" = "shared"
   }
 }

@@ -1,68 +1,83 @@
-name: Test Dispatcher
+name: Deploy RetailStore
 
 on:
   workflow_dispatch:
-    inputs:
-      service_name:
-        description: 'Servicio específico (vacío = todos)'
-        required: false
-        type: choice
-        options:
-          - ""
-          - admin
-          - cart
-          - catalog
-          - checkout
-          - orders
-          - ui
-
-permissions:
-  security-events: write
-  contents: read
-  id-token: write
 
 jobs:
-  resolve-matrix:
+  terraform:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    env:
+      AWS_REGION: us-east-1
+
     steps:
-      - id: set-matrix
+      - name: Descarga del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configuracion de credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Instalacion de terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform/environments/develop
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: terraform/environments/develop
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: terraform/environments/develop
+        run: terraform plan
+
+      - name: Terraform Apply
+        working-directory: terraform/environments/develop
+        run: terraform apply -auto-approve
+
+  deploy:
+    needs: terraform
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-1
+      CLUSTER_NAME: retailstore-develop-eks
+
+    steps:
+      - name: Descarga del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configuracion de credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Instalacion de kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configuracion de acceso al cluster EKS
         run: |
-          INPUT="${{ github.event.inputs.service_name }}"
-          BRANCH="${GITHUB_REF#refs/heads/}"
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $CLUSTER_NAME
 
-          # Si hay input, solo ese servicio
-          if [ -n "$INPUT" ]; then
-            MATRIX=$(echo '[{"service_name":"'$INPUT'","service_path":"src/'$INPUT'"}]')
+      - name: Otorgar permisos al script de deploy
+        run: chmod +x infra/scripts/deploy-dev.sh
 
-          # Si la rama coincide con un servicio, usar ese servicio
-          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "cart" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
-            MATRIX=$(echo '[{"service_name":"'$BRANCH'","service_path":"src/'$BRANCH'"}]')
+      - name: Deploy de la aplicacion mediante script
+        run: ./infra/scripts/deploy-dev.sh
 
-          else
-            MATRIX='[
-              {"service_name":"admin",    "service_path":"src/admin"},
-              {"service_name":"cart",     "service_path":"src/cart"},
-              {"service_name":"catalog",  "service_path":"src/catalog"},
-              {"service_name":"checkout", "service_path":"src/checkout"},
-              {"service_name":"orders",   "service_path":"src/orders"},
-              {"service_name":"ui",       "service_path":"src/ui"}
-            ]'
-          fi
-
-          # Compactar y exportar como output
-          echo "matrix=$(echo $MATRIX | jq -c .)" >> $GITHUB_OUTPUT
-
-  call-service:
-    needs: resolve-matrix
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJson(needs.resolve-matrix.outputs.matrix) }}
-
-    uses: ./.github/workflows/services_pipeline.yml
-    with:
-      service_path: ${{ matrix.service_path }}
-      service_name: ${{ matrix.service_name }}
-    secrets: inherit
+      - name: Estado del cluster
+        if: always()
+        run: |
+          kubectl get nodes
+          kubectl get pods -A
+          kubectl get svc -A
+          kubectl get ingress -A
