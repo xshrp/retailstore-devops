@@ -19,7 +19,7 @@ spec:
       containers:
         - name: ui
 
-          image: TODO : REEEMPLAZAR POR IMAGEN/ui:latest
+          image: xshrp/retailstore-ui:latest
 
           ports:
             - containerPort: 8080
