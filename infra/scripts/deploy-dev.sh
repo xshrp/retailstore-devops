@@ -2,61 +2,58 @@
 
 set -e
 
+BASE_DIR="$GITHUB_WORKSPACE"
+
 echo "----------------------------------------"
 echo "Iniciando deploy en el cluster 'develop'"
 echo "----------------------------------------"
 
-echo "Namespace (1/12)"
-kubectl apply -f k8s/base/namespace.yaml
+echo "Namespace (1/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/namespace.yaml"
 
 echo ""
-echo "Instalacion de NGINX Ingress Controller (2/12)"
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+echo "Redis (2/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/redis.yaml"
 
 echo ""
-echo "Redis (3/12)"
-kubectl apply -f k8s/base/redis.yaml
+echo "Postgres (3/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/postgres.yaml"
 
 echo ""
-echo "Postgres (4/12)"
-kubectl apply -f k8s/base/postgres.yaml
+echo "Servicios (4/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/services.yaml"
 
 echo ""
-echo "Servicios (5/12)"
-kubectl apply -f k8s/base/services.yaml
+echo "Catalog (5/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/catalog.yaml"
 
 echo ""
-echo "Catalog (6/12)"
-kubectl apply -f k8s/base/catalog.yaml
+echo "Cart (6/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/cart.yaml"
 
 echo ""
-echo "Cart (7/12)"
-kubectl apply -f k8s/base/cart.yaml
+echo "Orders (7/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/orders.yaml"
 
 echo ""
-echo "Orders (8/12)"
-kubectl apply -f k8s/base/orders.yaml
+echo "Checkout (8/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/checkout.yaml"
 
 echo ""
-echo "Checkout (9/12)"
-kubectl apply -f k8s/base/checkout.yaml
+echo "UI (9/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/ui.yaml"
 
 echo ""
-echo "UI (10/12)"
-kubectl apply -f k8s/base/ui.yaml
+echo "Admin (10/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/admin.yaml"
 
 echo ""
-echo "Admin (11/12)"
-kubectl apply -f k8s/base/admin.yaml
-
-echo ""
-echo "Ingress (12/12)"
-kubectl apply -f k8s/base/ingress.yaml
+echo "Ingress (11/11)"
+kubectl apply -f "$BASE_DIR/k8s/base/ingress.yaml"
 
 echo "----------------------------------------"
-echo "Deploy de 'develop'" finalizado
+echo "Deploy de 'develop' finalizado"
 echo "----------------------------------------"
-
 
 echo ""
 echo "Pods:"
