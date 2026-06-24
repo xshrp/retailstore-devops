@@ -63,19 +63,28 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ECR_REGISTRY=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
+          declare -A CONTEXTS=(
+            [catalog]=./src/catalog
+            [carts]=./src/cart
+            [orders]=./src/orders
+            [checkout]=./src/checkout
+            [ui]=./src/ui
+            [admin]=./src/admin
+          )
+
           SERVICES=(catalog carts orders checkout ui admin)
 
           for service in "${SERVICES[@]}"
           do
-            echo "Building $service"
+            echo "Servicio (build): $service"
 
-            docker build -t $service ./src/$service
+            docker build -t $service "${CONTEXTS[$service]}"
 
             docker tag $service:latest \
-              $ECR_REGISTRY/retail-dev/$service:latest
+              $ECR_REGISTRY/retailstore-develop/$service:latest
 
             docker push \
-              $ECR_REGISTRY/retail-dev/$service:latest
+              $ECR_REGISTRY/retailstore-develop/$service:latest
           done
 
       - name: Despliegue de ECS services

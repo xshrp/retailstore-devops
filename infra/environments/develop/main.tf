@@ -33,6 +33,8 @@ module "ecs" {
 
   vpc_id          = module.networking.vpc_id
   private_subnets = module.networking.private_subnets
+
+  alb_security_group_id = module.alb.alb_security_group_id
 }
 
 module "ecr" {
@@ -58,7 +60,6 @@ module "ecs_services" {
   environment = var.environment
 
   cluster_name        = module.ecs.cluster_name
-  execution_role_arn  = module.ecs.execution_role_arn
   public_subnets  = module.networking.public_subnets
   private_subnets = module.networking.private_subnets
   security_group_id   = module.ecs.ecs_security_group
@@ -175,6 +176,4 @@ module "alb" {
 
   vpc_id         = module.networking.vpc_id
   public_subnets = module.networking.public_subnets
-
-  security_group_id = module.ecs.ecs_security_group
 }

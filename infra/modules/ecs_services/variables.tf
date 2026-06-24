@@ -2,7 +2,6 @@ variable "app_name" {}
 variable "environment" {}
 
 variable "cluster_name" {}
-variable "execution_role_arn" {}
 
 variable "public_subnets" {
   type = list(string)

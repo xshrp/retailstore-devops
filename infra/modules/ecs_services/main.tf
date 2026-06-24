@@ -8,7 +8,7 @@ resource "aws_ecs_task_definition" "this" {
   cpu    = each.value.cpu
   memory = each.value.memory
 
-  execution_role_arn = var.execution_role_arn
+  execution_role_arn = data.aws_iam_role.labrole.arn
 
   container_definitions = jsonencode([
     {

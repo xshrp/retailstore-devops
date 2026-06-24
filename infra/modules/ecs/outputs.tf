@@ -9,7 +9,3 @@ output "cluster_name" {
 output "ecs_security_group" {
   value = aws_security_group.ecs.id
 }
-
-output "execution_role_arn" {
-  value = aws_iam_role.ecs_execution_role.arn
-}

@@ -1,11 +1,31 @@
+resource "aws_security_group" "alb" {
+  name   = "${var.app_name}-${var.environment}-alb-sg"
+  vpc_id = var.vpc_id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_lb" "this" {
   name               = "${var.app_name}-${var.environment}-alb"
   load_balancer_type = "application"
   internal           = false
 
   subnets         = var.public_subnets
-  security_groups = [var.security_group_id]
+  security_groups = [aws_security_group.alb.id]
 }
+
 resource "aws_lb_target_group" "ui" {
   name        = "${var.app_name}-${var.environment}-ui-tg"
   port        = 8080
