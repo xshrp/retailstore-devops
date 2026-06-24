@@ -95,13 +95,6 @@ jobs:
       - name: Dar permisos al script
         run: chmod +x ./infra/scripts/deploy-dev.sh
 
-      - name: Instalar EBS CSI Driver
-        run: |
-          eksctl create addon \
-            --name aws-ebs-csi-driver \
-            --cluster $CLUSTER_NAME \
-            --region $AWS_REGION || true
-
       - name: Ejecutar deploy Kubernetes
         run: ./infra/scripts/deploy-dev.sh
 

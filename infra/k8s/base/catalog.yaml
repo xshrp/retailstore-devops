@@ -18,7 +18,6 @@ spec:
     spec:
       containers:
         - name: catalog
-
           image: xshrp/retailstore-catalog:latest
 
           ports:
