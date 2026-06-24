@@ -3,7 +3,7 @@ WORKDIR /app
 RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/releases ./.yarn/releases
-RUN yarn install --immutable
+RUN yarn install 
 COPY . .
 RUN yarn build
 
@@ -15,7 +15,7 @@ ENV PORT=8080
 RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/releases ./.yarn/releases
-RUN yarn install --immutable --production
+RUN yarn workspaces focus --all --production
 COPY --from=builder /app/dist ./dist
 EXPOSE 8080
 USER appuser 
