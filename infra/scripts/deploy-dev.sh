@@ -27,7 +27,7 @@ sleep 5
 
 echo ""
 echo "Postgres Init ConfigMap"
-kubectl apply -f "$BASE_DIR/infra/k8s/base/postgres-init-configmap.yaml"
+kubectl apply -f "$BASE_DIR/infra/k8s/base/postgres-init-config-map.yaml"
 echo "Esperando 2 segundos para reducir la presion del cluster..."
 sleep 2
 
