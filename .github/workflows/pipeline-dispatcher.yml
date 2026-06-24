@@ -2,67 +2,59 @@ name: Test Dispatcher
 
 on:
   workflow_dispatch:
-    inputs:
-      service_name:
-        description: 'Servicio específico (vacío = todos)'
-        required: false
-        type: choice
-        options:
-          - ""
-          - admin
-          - cart
-          - catalog
-          - checkout
-          - orders
-          - ui
 
-permissions:
-  security-events: write
-  contents: read
-  id-token: write
+env:
+  ECS_CLUSTER: retailstore-develop
 
 jobs:
-  resolve-matrix:
+  deploy:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
     steps:
-      - id: set-matrix
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configuracion de credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login a Amazon ECR
         run: |
-          INPUT="${{ github.event.inputs.service_name }}"
-          BRANCH="${GITHUB_REF#refs/heads/}"
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+          | docker login --username AWS --password-stdin \
+          ${{ secrets.ECR_REGISTRY }}
 
-          # Si hay input, solo ese servicio
-          if [ -n "$INPUT" ]; then
-            MATRIX=$(echo '[{"service_name":"'$INPUT'","service_path":"src/'$INPUT'"}]')
+      - name: Construccion y push de imagenes
+        run: |
+          SERVICES=(catalog carts orders checkout ui admin)
 
-          # Si la rama coincide con un servicio, usar ese servicio
-          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "cart" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
-            MATRIX=$(echo '[{"service_name":"'$BRANCH'","service_path":"src/'$BRANCH'"}]')
+          for service in "${SERVICES[@]}"
+          do
+            echo "Building $service"
 
-          else
-            MATRIX='[
-              {"service_name":"admin",    "service_path":"src/admin"},
-              {"service_name":"cart",     "service_path":"src/cart"},
-              {"service_name":"catalog",  "service_path":"src/catalog"},
-              {"service_name":"checkout", "service_path":"src/checkout"},
-              {"service_name":"orders",   "service_path":"src/orders"},
-              {"service_name":"ui",       "service_path":"src/ui"}
-            ]'
-          fi
+            docker build -t $service ./src/$service
 
-          # Compactar y exportar como output
-          echo "matrix=$(echo $MATRIX | jq -c .)" >> $GITHUB_OUTPUT
+            docker tag $service:latest \
+              ${{ secrets.ECR_REGISTRY }}/retail-dev/$service:latest
 
-  call-service:
-    needs: resolve-matrix
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJson(needs.resolve-matrix.outputs.matrix) }}
+            docker push \
+              ${{ secrets.ECR_REGISTRY }}/retail-dev/$service:latest
+          done
 
-    uses: ./.github/workflows/services_pipeline.yml
-    with:
-      service_path: ${{ matrix.service_path }}
-      service_name: ${{ matrix.service_name }}
-    secrets: inherit
+      - name: Despliegue de ECS services
+        run: |
+          SERVICES=(catalog carts orders checkout ui admin)
+
+          for service in "${SERVICES[@]}"
+          do
+            echo "Desplegando: $service"
+
+            aws ecs update-service \
+              --cluster retailstore-develop \
+              --service $service \
+              --force-new-deployment
+          done
