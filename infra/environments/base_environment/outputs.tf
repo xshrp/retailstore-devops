@@ -1,19 +1,24 @@
 output "vpc_id" {
-  value = module.networking.vpc_id
+  description = "VPC ID"
+  value       = module.app.vpc_id
 }
 
 output "public_subnets" {
-  value = module.networking.public_subnets
+  description = "Public subnets"
+  value       = module.app.public_subnets
 }
 
 output "private_subnets" {
-  value = module.networking.private_subnets
+  description = "Private subnets"
+  value       = module.app.private_subnets
 }
 
 output "alb_dns" {
-  value = module.alb.alb_dns
+  description = "ALB DNS"
+  value       = module.app.alb_dns
 }
 
 output "internal_lb_dns" {
-  value = module.internal_lb.dns_name
+  description = "Internal LB DNS"
+  value       = module.internal_lb.dns_name
 }

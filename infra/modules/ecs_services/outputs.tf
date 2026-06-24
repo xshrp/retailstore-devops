@@ -1,3 +1,4 @@
 output "service_names" {
-  value = keys(var.services)
+  description = "ECS service names"
+  value       = keys(var.services)
 }
