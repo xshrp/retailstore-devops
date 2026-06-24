@@ -14,6 +14,6 @@ output "alb_dns" {
   value = module.alb.alb_dns
 }
 
-output "namespace_name" {
-  value = module.service_discovery.namespace_name
+output "internal_lb_dns" {
+  value = module.internal_lb.dns_name
 }

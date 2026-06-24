@@ -48,27 +48,29 @@ module "ecr" {
   ]
 }
 
-module "service_discovery" {
-  source = "../../modules/service_discovery"
+module "internal_lb" {
+  source = "../../modules/internal_lb"
 
   app_name    = var.app_name
   environment = var.environment
   vpc_id      = module.networking.vpc_id
 
-  services = [
-    "db",
-    "redis",
-    "catalog",
-    "carts",
-    "orders",
-    "checkout"
-  ]
+  private_subnets = module.networking.private_subnets
+
+  services = {
+    db       = { container_port = 5432, lb_port = 5432 }
+    redis    = { container_port = 6379, lb_port = 6379 }
+    catalog  = { container_port = 8080, lb_port = 8081 }
+    carts    = { container_port = 8080, lb_port = 8082 }
+    orders   = { container_port = 8080, lb_port = 8083 }
+    checkout = { container_port = 8080, lb_port = 8084 }
+  }
 }
 
 locals {
-  ns = module.service_discovery.namespace_name
+  lb = module.internal_lb.dns_name
 
-  # BD Init Loader
+  # Cargador de Init SQL
   db_init_command = "echo ${base64encode(var.init_sql_content)} | base64 -d > /docker-entrypoint-initdb.d/init.sql && exec docker-entrypoint.sh postgres"
 
   services = {
@@ -111,7 +113,7 @@ locals {
       environment = {
         GIN_MODE                            = "release"
         RETAIL_CATALOG_PERSISTENCE_PROVIDER = "postgres"
-        RETAIL_CATALOG_PERSISTENCE_ENDPOINT = "db.${local.ns}:5432"
+        RETAIL_CATALOG_PERSISTENCE_ENDPOINT = "${local.lb}:5432"
         RETAIL_CATALOG_PERSISTENCE_DB_NAME  = "catalogdb"
         RETAIL_CATALOG_PERSISTENCE_USER     = "retail_user"
         RETAIL_CATALOG_PERSISTENCE_PASSWORD = "retailpassword"
@@ -128,7 +130,7 @@ locals {
 
       environment = {
         CART_PERSISTENCE_PROVIDER = "postgres"
-        CART_POSTGRES_HOST        = "db.${local.ns}"
+        CART_POSTGRES_HOST        = local.lb
         CART_POSTGRES_PORT        = "5432"
         CART_POSTGRES_DB          = "cartdb"
         CART_POSTGRES_USER        = "retail_user"
@@ -147,7 +149,7 @@ locals {
 
       environment = {
         GIN_MODE                           = "release"
-        RETAIL_ORDERS_PERSISTENCE_ENDPOINT = "db.${local.ns}:5432"
+        RETAIL_ORDERS_PERSISTENCE_ENDPOINT = "${local.lb}:5432"
         RETAIL_ORDERS_PERSISTENCE_NAME     = "orders"
         RETAIL_ORDERS_PERSISTENCE_USERNAME = "retail_user"
         RETAIL_ORDERS_PERSISTENCE_PASSWORD = "retailpassword"
@@ -164,8 +166,8 @@ locals {
 
       environment = {
         RETAIL_CHECKOUT_PERSISTENCE_PROVIDER  = "redis"
-        RETAIL_CHECKOUT_PERSISTENCE_REDIS_URL = "redis://redis.${local.ns}:6379"
-        RETAIL_CHECKOUT_ENDPOINTS_ORDERS      = "http://orders.${local.ns}:8080"
+        RETAIL_CHECKOUT_PERSISTENCE_REDIS_URL = "redis://${local.lb}:6379"
+        RETAIL_CHECKOUT_ENDPOINTS_ORDERS      = "http://${local.lb}:8083"
       }
 
       public = false
@@ -178,10 +180,10 @@ locals {
       memory = 1024
 
       environment = {
-        RETAIL_UI_ENDPOINTS_CATALOG  = "http://catalog.${local.ns}:8080"
-        RETAIL_UI_ENDPOINTS_CARTS    = "http://carts.${local.ns}:8080"
-        RETAIL_UI_ENDPOINTS_CHECKOUT = "http://checkout.${local.ns}:8080"
-        RETAIL_UI_ENDPOINTS_ORDERS   = "http://orders.${local.ns}:8080"
+        RETAIL_UI_ENDPOINTS_CATALOG  = "http://${local.lb}:8081"
+        RETAIL_UI_ENDPOINTS_CARTS    = "http://${local.lb}:8082"
+        RETAIL_UI_ENDPOINTS_CHECKOUT = "http://${local.lb}:8084"
+        RETAIL_UI_ENDPOINTS_ORDERS   = "http://${local.lb}:8083"
       }
 
       public = true
@@ -194,7 +196,7 @@ locals {
       memory = 1024
 
       environment = {
-        DB_HOST          = "db.${local.ns}"
+        DB_HOST          = local.lb
         DB_PORT          = "5432"
         DB_USER          = "retail_user"
         DB_PASSWORD      = "retailpassword"
@@ -214,19 +216,19 @@ module "ecs_services" {
   app_name    = var.app_name
   environment = var.environment
 
-  cluster_name       = module.ecs.cluster_name
-  public_subnets     = module.networking.public_subnets
-  private_subnets    = module.networking.private_subnets
-  security_group_id  = module.ecs.ecs_security_group
+  cluster_name      = module.ecs.cluster_name
+  public_subnets    = module.networking.public_subnets
+  private_subnets   = module.networking.private_subnets
+  security_group_id = module.ecs.ecs_security_group
 
   target_groups = {
     ui    = module.alb.ui_tg_arn
     admin = module.alb.admin_tg_arn
   }
 
-  service_discovery_arns = module.service_discovery.service_arns
+  internal_target_groups = module.internal_lb.target_group_arns
 
   services = local.services
 
-  depends_on = [module.ecr]
+  depends_on = [module.ecr, module.internal_lb]
 }

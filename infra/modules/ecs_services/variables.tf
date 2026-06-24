@@ -34,7 +34,7 @@ variable "target_groups" {
   default = {}
 }
 
-variable "service_discovery_arns" {
+variable "internal_target_groups" {
   type    = map(string)
   default = {}
 }

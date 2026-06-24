@@ -77,20 +77,22 @@ resource "aws_ecs_service" "this" {
   }
 
   dynamic "load_balancer" {
-    for_each = lookup(each.value, "public", false) ? [1] : []
+    for_each = lookup(var.target_groups, each.key, null) != null ? [1] : []
 
     content {
       target_group_arn = var.target_groups[each.key]
-      container_name   = each.key
-      container_port   = each.value.port
+      container_name    = each.key
+      container_port    = each.value.port
     }
   }
 
-  dynamic "service_registries" {
-    for_each = lookup(var.service_discovery_arns, each.key, null) != null ? [1] : []
+  dynamic "load_balancer" {
+    for_each = lookup(var.internal_target_groups, each.key, null) != null ? [1] : []
 
     content {
-      registry_arn = var.service_discovery_arns[each.key]
+      target_group_arn = var.internal_target_groups[each.key]
+      container_name    = each.key
+      container_port    = each.value.port
     }
   }
 }
