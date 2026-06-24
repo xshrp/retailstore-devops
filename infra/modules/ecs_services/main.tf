@@ -1,7 +1,14 @@
+resource "aws_cloudwatch_log_group" "this" {
+  for_each = var.services
+
+  name              = "/ecs/${var.app_name}-${var.environment}/${each.key}"
+  retention_in_days = 7
+}
+
 resource "aws_ecs_task_definition" "this" {
   for_each = var.services
 
-  family                   = each.key
+  family                   = "${var.app_name}-${var.environment}-${each.key}"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
 
@@ -9,29 +16,42 @@ resource "aws_ecs_task_definition" "this" {
   memory = each.value.memory
 
   execution_role_arn = data.aws_iam_role.labrole.arn
+  task_role_arn      = data.aws_iam_role.labrole.arn
 
   container_definitions = jsonencode([
-    {
-      name  = each.key
-      image = each.value.image
+    merge(
+      {
+        name      = each.key
+        image     = each.value.image
+        essential = true
 
-      essential = true
+        portMappings = [
+          {
+            containerPort = each.value.port
+            protocol      = "tcp"
+          }
+        ]
 
-      portMappings = [
-        {
-          containerPort = each.value.port
-          protocol      = "tcp"
+        environment = [
+          for k, v in each.value.environment :
+          {
+            name  = k
+            value = v
+          }
+        ]
+
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            "awslogs-group"         = aws_cloudwatch_log_group.this[each.key].name
+            "awslogs-region"        = data.aws_region.current.name
+            "awslogs-stream-prefix" = each.key
+          }
         }
-      ]
-
-      environment = [
-        for k, v in each.value.environment :
-        {
-          name  = k
-          value = v
-        }
-      ]
-    }
+      },
+      length(each.value.command) > 0 ? { command = each.value.command } : {},
+      length(each.value.entry_point) > 0 ? { entryPoint = each.value.entry_point } : {}
+    )
   ])
 }
 
@@ -42,7 +62,7 @@ resource "aws_ecs_service" "this" {
   cluster         = var.cluster_name
   task_definition = aws_ecs_task_definition.this[each.key].arn
 
-  launch_type = "FARGATE"
+  launch_type   = "FARGATE"
   desired_count = 1
 
   network_configuration {
@@ -63,6 +83,14 @@ resource "aws_ecs_service" "this" {
       target_group_arn = var.target_groups[each.key]
       container_name   = each.key
       container_port   = each.value.port
+    }
+  }
+
+  dynamic "service_registries" {
+    for_each = lookup(var.service_discovery_arns, each.key, null) != null ? [1] : []
+
+    content {
+      registry_arn = var.service_discovery_arns[each.key]
     }
   }
 }

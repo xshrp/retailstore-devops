@@ -2,10 +2,22 @@ name: Test Dispatcher
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Seleccione entorno (TODO : Cambiar a branch)"
+        required: true
+        type: choice
+        options:
+          - develop
+          - test
+          - prod
+        default: develop
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECS_CLUSTER: retailstore-develop
+  ENVIRONMENT: ${{ github.event.inputs.environment }}
+  ECS_CLUSTER: retailstore-${{ github.event.inputs.environment }}
+  ECR_PREFIX: retailstore-${{ github.event.inputs.environment }}
 
 jobs:
   terraform:
@@ -81,26 +93,21 @@ jobs:
           for service in "${SERVICES[@]}"
           do
             echo "Servicio (build): $service"
-
             docker build -t $service "${CONTEXTS[$service]}"
-
-            docker tag $service:latest \
-              $ECR_REGISTRY/retailstore-develop/$service:latest
-
-            docker push \
-              $ECR_REGISTRY/retailstore-develop/$service:latest
+            docker tag $service:latest $ECR_REGISTRY/retailstore-develop/$service:latest
+            docker push $ECR_REGISTRY/retailstore-develop/$service:latest
           done
 
       - name: Despliegue de ECS services
         run: |
           SERVICES=(catalog carts orders checkout ui admin)
-
+          
           for service in "${SERVICES[@]}"
           do
             echo "Desplegando: $service"
 
             aws ecs update-service \
-              --cluster retailstore-develop \
+              --cluster $ECS_CLUSTER \
               --service $service \
               --force-new-deployment
           done

@@ -21,11 +21,20 @@ variable "services" {
     memory      = number
     environment = map(string)
 
-    public      = optional(bool, false)
+    public = optional(bool, false)
+
+    # Init SQL Injection
+    command     = optional(list(string), [])
+    entry_point = optional(list(string), [])
   }))
 }
 
 variable "target_groups" {
-  type = map(string)
+  type    = map(string)
+  default = {}
+}
+
+variable "service_discovery_arns" {
+  type    = map(string)
   default = {}
 }
