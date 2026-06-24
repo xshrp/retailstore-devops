@@ -1,3 +1,7 @@
+resource "aws_ecs_cluster" "this" {
+  name = "${var.app_name}-${var.environment}"
+}
+
 resource "aws_security_group" "ecs" {
   name   = "${var.app_name}-${var.environment}-ecs-sg"
   vpc_id = var.vpc_id
