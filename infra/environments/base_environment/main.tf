@@ -1,5 +1,5 @@
 module "networking" {
-  source = "../networking"
+  source = "../../modules/networking"
 
   app_name    = var.app_name
   environment = var.environment
@@ -11,7 +11,7 @@ module "networking" {
 }
 
 module "alb" {
-  source = "../alb"
+  source = "../../modules/alb"
 
   app_name    = var.app_name
   environment = var.environment
@@ -21,7 +21,7 @@ module "alb" {
 }
 
 module "ecs" {
-  source = "../ecs"
+  source = "../../modules/ecs"
 
   app_name    = var.app_name
   environment = var.environment
@@ -33,7 +33,7 @@ module "ecs" {
 }
 
 module "ecr" {
-  source = "../ecr"
+  source = "../../modules/ecr"
 
   app_name    = var.app_name
   environment = var.environment
@@ -49,7 +49,7 @@ module "ecr" {
 }
 
 module "service_discovery" {
-  source = "../service_discovery"
+  source = "../../modules/service_discovery"
 
   app_name    = var.app_name
   environment = var.environment
@@ -209,7 +209,7 @@ locals {
 }
 
 module "ecs_services" {
-  source = "../ecs_services"
+  source = "../../modules/ecs_services"
 
   app_name    = var.app_name
   environment = var.environment

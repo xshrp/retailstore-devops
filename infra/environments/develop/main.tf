@@ -18,7 +18,7 @@ locals {
 }
 
 module "app" {
-  source = "../../environments/base_environment"
+  source = "../base_environment"
 
   app_name    = var.app_name
   environment = var.environment
