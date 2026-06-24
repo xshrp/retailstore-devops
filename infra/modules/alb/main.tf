@@ -36,7 +36,7 @@ resource "aws_lb_target_group" "ui" {
 }
 resource "aws_lb_target_group" "admin" {
   name        = "${var.app_name}-${var.environment}-admin-tg"
-  port        = 8081
+  port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
 

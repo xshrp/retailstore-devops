@@ -158,7 +158,7 @@ module "ecs_services" {
 
     admin = {
       image = "${module.ecr.repository_urls["admin"]}:latest"
-      port  = 8081
+      port  = 8080
       cpu    = 512
       memory = 1024
 
