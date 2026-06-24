@@ -4,10 +4,40 @@ on:
   workflow_dispatch:
 
 env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
   ECS_CLUSTER: retailstore-develop
 
 jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configuracion de credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Instalacion de Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: |
+          cd infra/environments/develop
+          terraform init
+
+      - name: Terraform Apply
+        run: |
+          cd infra/environments/develop
+          terraform apply -auto-approve
+
   deploy:
+    needs: terraform
     runs-on: ubuntu-latest
 
     steps:
@@ -30,6 +60,9 @@ jobs:
 
       - name: Construccion y push de imagenes
         run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REGISTRY=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
           SERVICES=(catalog carts orders checkout ui admin)
 
           for service in "${SERVICES[@]}"
@@ -39,10 +72,10 @@ jobs:
             docker build -t $service ./src/$service
 
             docker tag $service:latest \
-              ${{ secrets.ECR_REGISTRY }}/retail-dev/$service:latest
+              $ECR_REGISTRY/retail-dev/$service:latest
 
             docker push \
-              ${{ secrets.ECR_REGISTRY }}/retail-dev/$service:latest
+              $ECR_REGISTRY/retail-dev/$service:latest
           done
 
       - name: Despliegue de ECS services
