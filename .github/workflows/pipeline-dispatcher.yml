@@ -40,7 +40,7 @@ jobs:
 
       - name: Terraform Init
         run: |
-          cd infra/environments/develop
+          cd infra/environments/${{ github.event.inputs.environment }}
           terraform init
 
       - name: Terraform Apply
@@ -51,7 +51,7 @@ jobs:
           TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
         run: |
-          cd infra/environments/develop
+          cd infra/environments/${{ github.event.inputs.environment }}
           terraform apply -auto-approve
 
   deploy:
@@ -100,8 +100,8 @@ jobs:
           do
             echo "Servicio (build): $service"
             docker build -t $service "${CONTEXTS[$service]}"
-            docker tag $service:latest $ECR_REGISTRY/retailstore-develop/$service:latest
-            docker push $ECR_REGISTRY/retailstore-develop/$service:latest
+            docker tag $service:latest $ECR_REGISTRY/retailstore-${{ github.event.inputs.environment }}/$service:latest
+            docker push $ECR_REGISTRY/retailstore-${{ github.event.inputs.environment }}/$service:latest
           done
 
       - name: Despliegue de ECS services
