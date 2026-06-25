@@ -25,3 +25,29 @@ variable "private_subnets" {
 variable "init_sql_content" {
   type = string
 }
+
+# Git Secrets
+variable "postgres_user" {
+  type      = string
+  sensitive = true
+}
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "admin_username" {
+  type      = string
+  sensitive = true
+}
+
+variable "admin_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "admin_jwt_secret" {
+  type      = string
+  sensitive = true
+}

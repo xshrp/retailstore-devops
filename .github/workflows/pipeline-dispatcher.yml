@@ -44,6 +44,12 @@ jobs:
           terraform init
 
       - name: Terraform Apply
+        env:
+          TF_VAR_postgres_user: ${{ secrets.POSTGRES_USER }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
+          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
         run: |
           cd infra/environments/develop
           terraform apply -auto-approve

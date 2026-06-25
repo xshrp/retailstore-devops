@@ -82,8 +82,8 @@ locals {
       memory = 1024
 
       environment = {
-        POSTGRES_USER     = "retail_user"
-        POSTGRES_PASSWORD = "retailpassword"
+        POSTGRES_USER     = var.postgres_user
+        POSTGRES_PASSWORD = var.db_password
         POSTGRES_DB       = "orders"
       }
 
@@ -115,8 +115,8 @@ locals {
         RETAIL_CATALOG_PERSISTENCE_PROVIDER = "postgres"
         RETAIL_CATALOG_PERSISTENCE_ENDPOINT = "${local.lb}:5432"
         RETAIL_CATALOG_PERSISTENCE_DB_NAME  = "catalogdb"
-        RETAIL_CATALOG_PERSISTENCE_USER     = "retail_user"
-        RETAIL_CATALOG_PERSISTENCE_PASSWORD = "retailpassword"
+        RETAIL_CATALOG_PERSISTENCE_USER     = var.postgres_user
+        RETAIL_CATALOG_PERSISTENCE_PASSWORD = var.db_password
       }
 
       public = false
@@ -133,8 +133,8 @@ locals {
         CART_POSTGRES_HOST        = local.lb
         CART_POSTGRES_PORT        = "5432"
         CART_POSTGRES_DB          = "cartdb"
-        CART_POSTGRES_USER        = "retail_user"
-        CART_POSTGRES_PASSWORD    = "retailpassword"
+        CART_POSTGRES_USER     = var.postgres_user
+        CART_POSTGRES_PASSWORD = var.db_password
         PORT                      = "8080"
       }
 
@@ -151,8 +151,8 @@ locals {
         GIN_MODE                           = "release"
         RETAIL_ORDERS_PERSISTENCE_ENDPOINT = "${local.lb}:5432"
         RETAIL_ORDERS_PERSISTENCE_NAME     = "orders"
-        RETAIL_ORDERS_PERSISTENCE_USERNAME = "retail_user"
-        RETAIL_ORDERS_PERSISTENCE_PASSWORD = "retailpassword"
+        RETAIL_ORDERS_PERSISTENCE_USERNAME = var.postgres_user
+        RETAIL_ORDERS_PERSISTENCE_PASSWORD = var.db_password
       }
 
       public = false
@@ -198,11 +198,11 @@ locals {
       environment = {
         DB_HOST          = local.lb
         DB_PORT          = "5432"
-        DB_USER          = "retail_user"
-        DB_PASSWORD      = "retailpassword"
-        ADMIN_USERNAME   = "admin"
-        ADMIN_PASSWORD   = "admin"
-        ADMIN_JWT_SECRET = "change-me-in-production"
+        DB_USER          = var.postgres_user
+        DB_PASSWORD      = var.db_password
+        ADMIN_USERNAME   = var.admin_username
+        ADMIN_PASSWORD   = var.admin_password
+        ADMIN_JWT_SECRET = var.admin_jwt_secret
       }
 
       public = true
