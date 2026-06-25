@@ -1,0 +1,9 @@
+services:
+  catalog:
+    build:
+      context: ..
+    environment:
+      GIN_MODE: test
+      RETAIL_CATALOG_PERSISTENCE_PROVIDER: memory
+    ports:
+      - "8080:8080"

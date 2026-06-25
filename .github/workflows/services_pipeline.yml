@@ -194,11 +194,60 @@ jobs:
         with:
           sarif_file: gitleaks-results.sarif
   
+  functional-tests:
+    name: Functional API Tests (Newman)
+    runs-on: ubuntu-latest
+    needs: [sonar-quality, sca-scan, secret-scan]
+    env:
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+      SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check if tests exist
+        id: check
+        run: |
+          if [ -f "${{ env.SERVICE_PATH }}/tests/postman_collection.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No tests found for ${{ env.SERVICE_NAME }}, skipping"
+          fi
+
+      - name: Start service
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          docker compose -f ${{ env.SERVICE_PATH }}/tests/docker-compose.test.yml up -d --build
+          sleep 15
+
+      - name: Run Newman
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          docker run --rm \
+            --network host \
+            -v "$(pwd)/${{ env.SERVICE_PATH }}/tests:/etc/newman" \
+            postman/newman:latest \
+            run /etc/newman/postman_collection.json \
+            --environment /etc/newman/postman_environment.json \
+            --reporters cli,junit \
+            --reporter-junit-export /etc/newman/newman-results.xml
+
+      - name: Upload results
+        if: always() && steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-${{ env.SERVICE_NAME }}
+          path: ${{ env.SERVICE_PATH }}/tests/newman-results.xml
+
+      - name: Teardown
+        if: always() && steps.check.outputs.exists == 'true'
+        run: docker compose -f ${{ env.SERVICE_PATH }}/tests/docker-compose.test.yml down
 
   build-and-push:
     name: Build & Push Service Image to ECR
     runs-on: ubuntu-latest
-    needs: [sonar-quality, sca-scan, secret-scan]
+    needs: [sonar-quality, sca-scan, secret-scan, functional-tests]
     env:
       AWS_REGION: us-east-1
       SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
