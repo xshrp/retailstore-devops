@@ -1,0 +1,45 @@
+name: Test Services (Pipeline 2)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Entorno a desplegar (develop/test/prod)"
+        required: true
+        default: "develop"
+        type: choice
+        options:
+          - develop
+          - test
+          - prod
+      service_path:
+        description: 'Ruta relativa del microservicio (ej: src/admin)'
+        required: false
+        default: 'src/admin'
+      service_name:
+        description: 'Nombre simple del servicio (ej: admin)'
+        required: false
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        type: string
+      service_path:
+        required: false
+        type: string
+      service_name:
+        required: false
+        type: string
+
+permissions:
+  security-events: write
+  contents: read
+  id-token: write
+
+jobs:
+  code-scan:
+    name: Code Scan (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4

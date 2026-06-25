@@ -1,0 +1,119 @@
+name: Test Dispatcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Seleccione entorno (TODO : Cambiar a branch)"
+        required: true
+        type: choice
+        options:
+          - develop
+          - test
+          - prod
+        default: develop
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ENVIRONMENT: ${{ github.event.inputs.environment }}
+  ECS_CLUSTER: retailstore-${{ github.event.inputs.environment }}
+  ECR_PREFIX: retailstore-${{ github.event.inputs.environment }}
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configuracion de credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Instalacion de Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: |
+          cd infra/environments/${{ github.event.inputs.environment }}
+          terraform init
+
+      - name: Terraform Apply
+        env:
+          TF_VAR_postgres_user: ${{ secrets.POSTGRES_USER }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
+          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
+        run: |
+          cd infra/environments/${{ github.event.inputs.environment }}
+          terraform apply -auto-approve
+
+  deploy:
+    needs: terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configuracion de credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login a Amazon ECR
+        run: |
+          set -e
+
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REGISTRY=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+          aws ecr get-login-password --region $AWS_REGION \
+            | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+      - name: Construccion y push de imagenes
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REGISTRY=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+          declare -A CONTEXTS=(
+            [catalog]=./src/catalog
+            [carts]=./src/cart
+            [orders]=./src/orders
+            [checkout]=./src/checkout
+            [ui]=./src/ui
+            [admin]=./src/admin
+          )
+
+          SERVICES=(catalog carts orders checkout ui admin)
+
+          for service in "${SERVICES[@]}"
+          do
+            echo "Servicio (build): $service"
+            docker build -t $service "${CONTEXTS[$service]}"
+            docker tag $service:latest $ECR_REGISTRY/retailstore-${{ github.event.inputs.environment }}/$service:latest
+            docker push $ECR_REGISTRY/retailstore-${{ github.event.inputs.environment }}/$service:latest
+          done
+
+      - name: Despliegue de ECS services
+        run: |
+          SERVICES=(catalog carts orders checkout ui admin)
+          
+          for service in "${SERVICES[@]}"
+          do
+            echo "Desplegando: $service"
+
+            aws ecs update-service \
+              --cluster $ECS_CLUSTER \
+              --service $service \
+              --force-new-deployment
+          done
