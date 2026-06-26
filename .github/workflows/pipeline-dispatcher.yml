@@ -44,9 +44,9 @@ on:
         required: true
         type: choice
         options:
-          - Dev
-          - Test
-          - Prod
+          - dev
+          - test
+          - prod
 
 
 jobs:

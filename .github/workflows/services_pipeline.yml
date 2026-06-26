@@ -32,7 +32,7 @@ jobs:
       SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run Semgrep
         run: |
@@ -59,7 +59,7 @@ jobs:
       SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     steps:
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -113,7 +113,7 @@ jobs:
       SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Trivy SCA filesystem scan (SARIF)
         uses: aquasecurity/trivy-action@master
@@ -174,7 +174,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run GitLeaks
         run: |
@@ -203,7 +203,7 @@ jobs:
       SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check if tests exist
         id: check
@@ -219,7 +219,21 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         run: |
           docker compose -f ${{ env.SERVICE_PATH }}/tests/docker-compose.test.yml up -d --build
-          sleep 15
+
+          echo "Esperando que el servicio esté listo..."
+          for i in $(seq 1 24); do
+            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Servicio listo después de $((i * 5))s"
+              break
+            fi
+            echo "Intento $i/24 — esperando 5s..."
+            sleep 5
+            if [ $i -eq 24 ]; then
+              echo "Timeout: el servicio no levantó en 2 minutos"
+              docker compose -f ${{ env.SERVICE_PATH }}/tests/docker-compose.test.yml logs
+              exit 1
+            fi
+          done
 
       - name: Run Newman
         if: steps.check.outputs.exists == 'true'
@@ -257,7 +271,7 @@ jobs:
       environment: ${{ steps.set-env.outputs.environment }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Determinar entorno
         id: set-env
@@ -323,7 +337,7 @@ jobs:
       SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
