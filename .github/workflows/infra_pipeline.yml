@@ -5,10 +5,7 @@ on:
     inputs:
       environment:
         required: true
-        type: string
-      tfvars_file:
-        required: true
-        type: string
+        type: string       
 
 permissions:
   contents: read
@@ -16,18 +13,19 @@ permissions:
   pull-requests: write
 
 jobs:
-  deploy:
-    name: Terraform ${{ inputs.environment }} CI/CD
+  terraform:
+    name: Terraform ${{ inputs.environment }}
     runs-on: ubuntu-latest
     env:
       TF_IN_AUTOMATION: true
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-      AWS_REGION: us-east-1
+      AWS_SESSION_TOKEN:     ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION:            ${{ secrets.AWS_REGION }}   
     defaults:
       run:
-        working-directory: environments/${{ inputs.environment }}
+        working-directory: infra/environments/${{ inputs.environment }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,8 +41,14 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -var-file="${{ inputs.tfvars_file }}" -out=tfplan
+        run: terraform plan -out=tfplan  
         continue-on-error: true
+        env:
+          TF_VAR_postgres_user:    ${{ secrets.POSTGRES_USER }}
+          TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
+          TF_VAR_admin_username:   ${{ secrets.ADMIN_USERNAME }}
+          TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
 
       - name: Comment plan on PR
         if: github.event_name == 'pull_request'
@@ -70,3 +74,9 @@ jobs:
       - name: Terraform Apply
         if: github.event_name != 'pull_request'
         run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_postgres_user:    ${{ secrets.POSTGRES_USER }}
+          TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
+          TF_VAR_admin_username:   ${{ secrets.ADMIN_USERNAME }}
+          TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}

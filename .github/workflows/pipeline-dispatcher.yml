@@ -115,10 +115,10 @@ jobs:
           esac
 
   call-infra:
-    name: Llamar Pipeline de Infraestructura 
-    needs: configure-infra
-    uses: ./.github/workflows/infra.yml
+    name: Pipeline de Infraestructura
+    if: github.event_name == 'workflow_dispatch'
+    needs: call-service
+    uses: ./.github/workflows/infra_pipeline.yml
     with:
-      environment: ${{ inputs.environment }}
-      tfvars_file: terraform/envs/${{ inputs.environment }}.tfvars
+      environment: ${{ inputs.environment }}  
     secrets: inherit
