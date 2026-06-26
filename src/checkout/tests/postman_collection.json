@@ -28,18 +28,21 @@
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{\"items\":[{\"productId\":\"prod-1\",\"quantity\":1,\"price\":2000,\"name\":\"Widget\"}],\"shippingAddress\":{\"firstName\":\"Test\",\"lastName\":\"User\",\"email\":\"test@test.com\",\"address1\":\"123 St\",\"city\":\"NYC\",\"state\":\"NY\",\"zipCode\":\"10001\"}}"
+          "raw": "{\"items\":[{\"id\":\"item-1\",\"name\":\"Widget\",\"quantity\":1,\"price\":2000}],\"shippingAddress\":{\"firstName\":\"Test\",\"lastName\":\"User\",\"address1\":\"123 St\",\"city\":\"NYC\",\"state\":\"NY\",\"zip\":\"10001\",\"email\":\"test@test.com\"}}"
         }
       },
       "event": [{ "listen": "test", "script": { "exec": [
-        "pm.test('Status 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+        "pm.test('Status 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+        "pm.test('Has items', () => pm.expect(pm.response.json()).to.have.property('items'));",
+        "pm.test('Has subtotal', () => pm.expect(pm.response.json().subtotal).to.eql(2000));"
       ]}}]
     },
     {
       "name": "Get Checkout",
       "request": { "method": "GET", "url": "{{base_url}}/checkout/customer-123" },
       "event": [{ "listen": "test", "script": { "exec": [
-        "pm.test('Status 200', () => pm.response.to.have.status(200));"
+        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+        "pm.test('Has items', () => pm.expect(pm.response.json()).to.have.property('items'));"
       ]}}]
     }
   ]

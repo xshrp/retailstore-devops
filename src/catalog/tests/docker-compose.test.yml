@@ -1,9 +1,31 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: catalog_user
+      POSTGRES_PASSWORD: catalog_pass
+      POSTGRES_DB: catalogdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog_user -d catalogdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   catalog:
     build:
       context: ..
+      dockerfile: Dockerfile
+      args:
+        CGO_ENABLED: "1" 
     environment:
-      GIN_MODE: test
-      RETAIL_CATALOG_PERSISTENCE_PROVIDER: memory
+      RETAIL_CATALOG_PERSISTENCE_PROVIDER: postgres
+      RETAIL_CATALOG_PERSISTENCE_ENDPOINT: db:5432
+      RETAIL_CATALOG_PERSISTENCE_DB_NAME: catalogdb
+      RETAIL_CATALOG_PERSISTENCE_USER: catalog_user
+      RETAIL_CATALOG_PERSISTENCE_PASSWORD: catalog_pass
+      GIN_MODE: release
     ports:
       - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
