@@ -96,28 +96,9 @@ jobs:
       service_name: ${{ matrix.service_name }}
     secrets: inherit
 
-  configure-infra:
-    name: Configurar Infraestructura
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verifica environment seleccionado
-        run: |
-          ENV="${{ inputs.environment }}"
-          echo "Environment seleccionado: $ENV"
-
-          case "$ENV" in
-            develop|test|prod)
-              echo "TFVARS_FILE=terraform/envs/${ENV}.tfvars" >> $GITHUB_ENV
-              echo "Using tfvars: terraform/envs/${ENV}.tfvars"
-              ;;
-            *)
-              echo "Invalid environment: $ENV. Debe ser develop, test o prod" >&2
-              exit 1
-              ;;
-          esac
-
   call-infra:
     name: Pipeline de Infraestructura
+    needs: call-service
     if: github.event_name == 'workflow_dispatch'
     needs: call-service
     uses: ./.github/workflows/infra_pipeline.yml

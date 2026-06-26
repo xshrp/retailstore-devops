@@ -232,3 +232,26 @@ module "ecs_services" {
 
   depends_on = [module.ecr, module.internal_lb]
 }
+
+module "cloudwatch" {
+  source      = "../../modules/cloudwatch"
+  app_name    = var.app_name
+  environment = var.environment
+  aws_region  = var.region
+  cluster_name = module.ecs.cluster_name
+  alarm_email  = var.alarm_email
+
+  service_names = ["catalog", "carts", "orders", "checkout", "ui", "admin", "db", "redis"]
+
+  alb_arn_suffix      = module.alb.alb_arn_suffix
+  ui_tg_arn_suffix    = module.alb.ui_tg_arn_suffix
+  admin_tg_arn_suffix = module.alb.admin_tg_arn_suffix
+
+  cpu_threshold             = 80
+  memory_threshold          = 80
+  error_5xx_threshold       = 10
+  response_time_threshold   = 2
+  unhealthy_hosts_threshold = 1
+
+  depends_on = [module.ecs_services]
+}

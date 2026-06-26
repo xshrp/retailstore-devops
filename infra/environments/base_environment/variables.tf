@@ -51,3 +51,9 @@ variable "admin_jwt_secret" {
   type      = string
   sensitive = true
 }
+
+variable "alarm_email" {
+  description = "Email para notificaciones de alarmas"
+  type        = string
+  default     = ""
+}
