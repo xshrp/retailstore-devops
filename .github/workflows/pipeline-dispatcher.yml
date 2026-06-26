@@ -44,7 +44,7 @@ on:
         required: true
         type: choice
         options:
-          - dev
+          - develop
           - test
           - prod
 
@@ -106,12 +106,12 @@ jobs:
           echo "Environment seleccionado: $ENV"
 
           case "$ENV" in
-            dev|test|prod)
+            develop|test|prod)
               echo "TFVARS_FILE=terraform/envs/${ENV}.tfvars" >> $GITHUB_ENV
               echo "Using tfvars: terraform/envs/${ENV}.tfvars"
               ;;
             *)
-              echo "Invalid environment: $ENV. Debe ser dev, test o prod" >&2
+              echo "Invalid environment: $ENV. Debe ser develop, test o prod" >&2
               exit 1
               ;;
           esac
