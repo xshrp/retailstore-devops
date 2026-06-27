@@ -150,84 +150,137 @@ resource "aws_cloudwatch_dashboard" "this" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type = "text"; x = 0; y = 0; width = 24; height = 1
-        properties = { markdown = "## ${var.app_name} — ${var.environment} | CPU · Memoria · Errores · Latencia · Disponibilidad" }
+        type   = "text"
+        x      = 0
+        y      = 0
+        width  = 24
+        height = 1
+        properties = {
+          markdown = "## ${var.app_name} — ${var.environment} | CPU · Memoria · Errores · Latencia · Disponibilidad"
+        }
       },
-
       {
-        type = "metric"; x = 0; y = 1; width = 12; height = 6
+        type   = "metric"
+        x      = 0
+        y      = 1
+        width  = 12
+        height = 6
         properties = {
           title  = "CPU Utilization — todos los servicios"
-          region = var.aws_region; period = 300; stat = "Average"; view = "timeSeries"
+          region = var.aws_region
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
           metrics = [
             for s in var.service_names :
             ["AWS/ECS", "CPUUtilization", "ClusterName", var.cluster_name, "ServiceName", s, { label = s }]
           ]
-          annotations = { horizontal = [{ value = var.cpu_threshold, label = "Límite", color = "#ff6961" }] }
+          annotations = {
+            horizontal = [{ value = var.cpu_threshold, label = "Límite", color = "#ff6961" }]
+          }
         }
       },
-
       {
-        type = "metric"; x = 12; y = 1; width = 12; height = 6
+        type   = "metric"
+        x      = 12
+        y      = 1
+        width  = 12
+        height = 6
         properties = {
           title  = "Memory Utilization — todos los servicios"
-          region = var.aws_region; period = 300; stat = "Average"; view = "timeSeries"
+          region = var.aws_region
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
           metrics = [
             for s in var.service_names :
             ["AWS/ECS", "MemoryUtilization", "ClusterName", var.cluster_name, "ServiceName", s, { label = s }]
           ]
-          annotations = { horizontal = [{ value = var.memory_threshold, label = "Límite", color = "#ff6961" }] }
+          annotations = {
+            horizontal = [{ value = var.memory_threshold, label = "Límite", color = "#ff6961" }]
+          }
         }
       },
-
       {
-        type = "metric"; x = 0; y = 7; width = 8; height = 6
+        type   = "metric"
+        x      = 0
+        y      = 7
+        width  = 8
+        height = 6
         properties = {
-          title  = "ALB — Request Count"
-          region = var.aws_region; period = 300; stat = "Sum"; view = "timeSeries"
+          title   = "ALB — Request Count"
+          region  = var.aws_region
+          period  = 300
+          stat    = "Sum"
+          view    = "timeSeries"
           metrics = [["AWS/ApplicationELB", "RequestCount", "LoadBalancer", var.alb_arn_suffix]]
         }
       },
-
       {
-        type = "metric"; x = 8; y = 7; width = 8; height = 6
+        type   = "metric"
+        x      = 8
+        y      = 7
+        width  = 8
+        height = 6
         properties = {
           title  = "ALB — Errores 5XX"
-          region = var.aws_region; period = 300; stat = "Sum"; view = "timeSeries"
+          region = var.aws_region
+          period = 300
+          stat   = "Sum"
+          view   = "timeSeries"
           metrics = [
             ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { label = "Target 5XX" }],
-            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count",    "LoadBalancer", var.alb_arn_suffix, { label = "ELB 5XX" }]
+            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { label = "ELB 5XX" }]
           ]
-          annotations = { horizontal = [{ value = var.error_5xx_threshold, label = "Límite", color = "#ff6961" }] }
+          annotations = {
+            horizontal = [{ value = var.error_5xx_threshold, label = "Límite", color = "#ff6961" }]
+          }
         }
       },
-
       {
-        type = "metric"; x = 16; y = 7; width = 8; height = 6
+        type   = "metric"
+        x      = 16
+        y      = 7
+        width  = 8
+        height = 6
         properties = {
-          title  = "ALB — Latencia promedio"
-          region = var.aws_region; period = 300; stat = "Average"; view = "timeSeries"
+          title   = "ALB — Latencia promedio"
+          region  = var.aws_region
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
           metrics = [["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix]]
-          annotations = { horizontal = [{ value = var.response_time_threshold, label = "Límite", color = "#ff6961" }] }
+          annotations = {
+            horizontal = [{ value = var.response_time_threshold, label = "Límite", color = "#ff6961" }]
+          }
         }
       },
-
       {
-        type = "metric"; x = 0; y = 13; width = 12; height = 6
+        type   = "metric"
+        x      = 0
+        y      = 13
+        width  = 12
+        height = 6
         properties = {
           title  = "ALB — Hosts Saludables"
-          region = var.aws_region; period = 60; stat = "Average"; view = "timeSeries"
+          region = var.aws_region
+          period = 60
+          stat   = "Average"
+          view   = "timeSeries"
           metrics = [
-            ["AWS/ApplicationELB", "HealthyHostCount",   "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.ui_tg_arn_suffix,    { color = "#2ca02c", label = "UI Healthy" }],
-            ["AWS/ApplicationELB", "UnHealthyHostCount", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.ui_tg_arn_suffix,    { color = "#d62728", label = "UI Unhealthy" }],
-            ["AWS/ApplicationELB", "HealthyHostCount",   "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.admin_tg_arn_suffix, { color = "#1f77b4", label = "Admin Healthy" }],
+            ["AWS/ApplicationELB", "HealthyHostCount", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.ui_tg_arn_suffix, { color = "#2ca02c", label = "UI Healthy" }],
+            ["AWS/ApplicationELB", "UnHealthyHostCount", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.ui_tg_arn_suffix, { color = "#d62728", label = "UI Unhealthy" }],
+            ["AWS/ApplicationELB", "HealthyHostCount", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.admin_tg_arn_suffix, { color = "#1f77b4", label = "Admin Healthy" }],
             ["AWS/ApplicationELB", "UnHealthyHostCount", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.admin_tg_arn_suffix, { color = "#ff7f0e", label = "Admin Unhealthy" }]
           ]
         }
       },
-
       {
-        type = "alarm"; x = 12; y = 13; width = 12; height = 6
+        type   = "alarm"
+        x      = 12
+        y      = 13
+        width  = 12
+        height = 6
         properties = {
           title = "Estado de Alarmas"
           alarms = concat(

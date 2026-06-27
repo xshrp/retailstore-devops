@@ -2,7 +2,10 @@ variable "app_name"    { type = string }
 variable "environment" { type = string }
 variable "aws_region"  { type = string }
 variable "cluster_name" { type = string }
-variable "alarm_email"  { type = string; default = "" }
+variable "alarm_email" { 
+  type = string
+  default = "" 
+}
 
 variable "service_names" {
   description = "Lista de nombres de servicios ECS a monitorear"
@@ -25,11 +28,30 @@ variable "admin_tg_arn_suffix" {
   type        = string
 }
 
-variable "cpu_threshold"             { type = number; default = 80 }
-variable "memory_threshold"          { type = number; default = 80 }
-variable "error_5xx_threshold"       { type = number; default = 10 }
-variable "response_time_threshold"   { type = number; default = 2  }
-variable "unhealthy_hosts_threshold" { type = number; default = 1  }
+variable "cpu_threshold" { 
+  type = number
+  default = 80 
+}
+
+variable "memory_threshold" { 
+  type = number
+  default = 80 
+}
+
+variable "error_5xx_threshold" { 
+  type = number
+  default = 10
+}
+
+variable "response_time_threshold" { 
+  type = number
+  default = 2  
+}
+
+variable "unhealthy_hosts_threshold" { 
+  type = number 
+  default = 1  
+}
 
 variable "lambda_role_arn" {
   description = "ARN del rol IAM para la Lambda (usar LabRole en Learner Lab)"
