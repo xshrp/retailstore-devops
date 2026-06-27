@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
 
-      - name: Configurar credenciales AWS   # ← FALTA ESTE STEP
+      - name: Configurar credenciales AWS   
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -44,6 +44,26 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "LAMBDA_ROLE=arn:aws:iam::${ACCOUNT_ID}:role/LabRole" >> $GITHUB_ENV
 
+      - name: Crear bucket S3 para Terraform state
+        run: |
+          BUCKET="devops-retail-gj-bucket"
+          REGION="${{ secrets.AWS_REGION }}"
+
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "✅ Bucket $BUCKET ya existe"
+          else
+            echo "▶ Creando bucket $BUCKET..."
+            aws s3api create-bucket \
+              --bucket "$BUCKET" \
+              --region "$REGION"
+
+            # Habilitar versionado (recomendado para tfstate)
+            aws s3api put-bucket-versioning \
+              --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+
+            echo "✅ Bucket creado con versionado habilitado"
+          fi
       - name: Terraform Init
         run: terraform init
 
