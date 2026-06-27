@@ -100,7 +100,6 @@ jobs:
     name: Pipeline de Infraestructura
     needs: call-service
     if: github.event_name == 'workflow_dispatch'
-    needs: call-service
     uses: ./.github/workflows/infra_pipeline.yml
     with:
       environment: ${{ inputs.environment }}  

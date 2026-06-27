@@ -245,3 +245,34 @@ resource "aws_cloudwatch_dashboard" "this" {
     ]
   })
 }
+
+resource "aws_lambda_function" "alarm_notifier" {
+  filename         = "${path.module}/lambda_notifier.zip"
+  source_code_hash = filebase64sha256("${path.module}/lambda_notifier.zip")
+  function_name    = "${var.app_name}-${var.environment}-alarm-notifier"
+  role             = var.lambda_role_arn
+  handler          = "index.handler"
+  runtime          = "nodejs20.x"
+
+  environment {
+    variables = {
+      WEBHOOK_URL = var.webhook_url
+    }
+  }
+
+  tags = { environment = var.environment }
+}
+
+resource "aws_lambda_permission" "sns" {
+  statement_id  = "AllowSNSInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.alarm_notifier.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.alarms.arn
+}
+
+resource "aws_sns_topic_subscription" "lambda" {
+  topic_arn = aws_sns_topic.alarms.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.alarm_notifier.arn
+}

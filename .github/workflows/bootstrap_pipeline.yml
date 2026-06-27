@@ -29,8 +29,20 @@ jobs:
         working-directory: infra/environments/${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: hashicorp/setup-terraform@v3
+
+      - name: Configurar credenciales AWS   # ← FALTA ESTE STEP
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Obtener Lambda Role ARN
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "LAMBDA_ROLE=arn:aws:iam::${ACCOUNT_ID}:role/LabRole" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: terraform init
@@ -49,6 +61,7 @@ jobs:
           TF_VAR_admin_username:   ${{ secrets.ADMIN_USERNAME }}
           TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
+          TF_VAR_lambda_role_arn:  ${{ env.LAMBDA_ROLE }}
 
   build-and-push:
     name: "2/3 Build & Push imágenes a ECR"
@@ -94,6 +107,18 @@ jobs:
               "$ECR_REGISTRY/retailstore-${ENV}/$service:latest"
             echo "✅ $service pushed"
           done
+        
+      - name: Empaquetar Lambda notifier
+        run: |
+          cd infra/lambda/alarm_notifier
+          zip -j lambda_notifier.zip index.js
+          cp lambda_notifier.zip ../../modules/cloudwatch/lambda_notifier.zip
+
+      - name: Upload Lambda zip          
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-notifier
+          path: infra/modules/cloudwatch/lambda_notifier.zip
 
   terraform-full:
     name: "3/3 Terraform Full (ECS services + todo)"
@@ -112,6 +137,25 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
 
+      - name: Download Lambda zip       
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-notifier
+          path: infra/modules/cloudwatch/
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Obtener Lambda Role ARN    # ← NUEVO
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "LAMBDA_ROLE=arn:aws:iam::${ACCOUNT_ID}:role/LabRole" >> $GITHUB_ENV
+
       - name: Terraform Init
         run: terraform init
 
@@ -123,3 +167,4 @@ jobs:
           TF_VAR_admin_username:   ${{ secrets.ADMIN_USERNAME }}
           TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
+          TF_VAR_lambda_role_arn:  ${{ env.LAMBDA_ROLE }}

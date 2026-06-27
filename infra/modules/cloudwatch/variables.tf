@@ -30,3 +30,14 @@ variable "memory_threshold"          { type = number; default = 80 }
 variable "error_5xx_threshold"       { type = number; default = 10 }
 variable "response_time_threshold"   { type = number; default = 2  }
 variable "unhealthy_hosts_threshold" { type = number; default = 1  }
+
+variable "lambda_role_arn" {
+  description = "ARN del rol IAM para la Lambda (usar LabRole en Learner Lab)"
+  type        = string
+}
+
+variable "webhook_url" {
+  description = "Webhook URL de Slack o Teams para notificaciones"
+  type        = string
+  default     = ""
+}

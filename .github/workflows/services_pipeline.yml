@@ -309,11 +309,10 @@ jobs:
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ENV: ${{ steps.set-env.outputs.environment }}
-          ECR_REPO: ${{ env.SERVICE_NAME }}-service-${{ steps.set-env.outputs.environment }}
+          ECR_REPO: retailstore-${{ steps.set-env.outputs.environment }}/${{ env.SERVICE_NAME }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI="$REGISTRY/$ECR_REPO:$IMAGE_TAG"
-
           docker build \
             --label "git.sha=${{ github.sha }}" \
             --label "git.branch=${{ github.ref_name }}" \
@@ -321,11 +320,10 @@ jobs:
             -t "$IMAGE_URI" \
             -t "$REGISTRY/$ECR_REPO:latest" \
             ${{ env.SERVICE_PATH }}
-
           docker push "$IMAGE_URI"
           docker push "$REGISTRY/$ECR_REPO:latest"
-
           echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
 
   image-scan:
     name: Image Scan (Trivy)
@@ -393,10 +391,8 @@ jobs:
         env:
           ENV: ${{ needs.build-and-push.outputs.environment }}
           IMAGE_URI: ${{ needs.build-and-push.outputs.image_uri }}
-          ECS_CLUSTER: ecs-cluster-${{ needs.build-and-push.outputs.environment }}
-          ECS_SERVICE: ${{ env.SERVICE_NAME }}-service-${{ needs.build-and-push.outputs.environment }}
-          ECS_TASK_FAMILY: ${{ env.SERVICE_NAME }}-service-${{ needs.build-and-push.outputs.environment }}
-          CONTAINER_NAME: ${{ env.SERVICE_NAME }}-service
+          ECS_CLUSTER: retailstore-${{ needs.build-and-push.outputs.environment }}
+          ECS_SERVICE: ${{ env.SERVICE_NAME }}
         run: |
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \

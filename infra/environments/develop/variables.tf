@@ -52,3 +52,6 @@ variable "alarm_email" {
   type        = string
   default     = ""
 }
+
+variable "lambda_role_arn" { type = string }
+variable "webhook_url"     { type = string; default = "" }

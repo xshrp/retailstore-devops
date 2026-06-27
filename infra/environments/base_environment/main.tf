@@ -234,10 +234,10 @@ module "ecs_services" {
 }
 
 module "cloudwatch" {
-  source      = "../../modules/cloudwatch"
-  app_name    = var.app_name
-  environment = var.environment
-  aws_region  = var.region
+  source       = "../../modules/cloudwatch"
+  app_name     = var.app_name
+  environment  = var.environment
+  aws_region   = var.region
   cluster_name = module.ecs.cluster_name
   alarm_email  = var.alarm_email
 
@@ -252,6 +252,9 @@ module "cloudwatch" {
   error_5xx_threshold       = 10
   response_time_threshold   = 2
   unhealthy_hosts_threshold = 1
+
+  lambda_role_arn = var.lambda_role_arn   
+  webhook_url     = var.webhook_url       
 
   depends_on = [module.ecs_services]
 }
