@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+      POSTGRES_DB: orders
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d orders"]
+      interval: 5s
+      retries: 5
+
+  orders:
+    build:
+      context: ..       
+    environment:
+      RETAIL_ORDERS_PERSISTENCE_ENDPOINT: db:5432
+      RETAIL_ORDERS_PERSISTENCE_NAME: orders
+      RETAIL_ORDERS_PERSISTENCE_USERNAME: test_user
+      RETAIL_ORDERS_PERSISTENCE_PASSWORD: test_pass
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy

@@ -1,29 +1,17 @@
-name: Test Services (Pipeline 2)
+name: Service CI/CD
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Entorno a desplegar (develop/test/prod)"
-        required: true
-        default: "develop"
-        type: choice
-        options:
-          - develop
-          - test
-          - prod
-      service_path:
-        description: 'Ruta relativa del microservicio (ej: src/admin)'
-        required: false
-        default: 'src/admin'
-      service_name:
-        description: 'Nombre simple del servicio (ej: admin)'
-        required: false
+  push:
+    branches: ["main", "develop"]
+    paths:
+      - 'src/**'
+  pull_request:
+    branches: ["main", "develop"]
+    paths:
+      - 'src/**'
+
   workflow_call:
     inputs:
-      environment:
-        required: false
-        type: string
       service_path:
         required: false
         type: string
@@ -40,6 +28,377 @@ jobs:
   code-scan:
     name: Code Scan (Semgrep)
     runs-on: ubuntu-latest
+    env:
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Run Semgrep
+        run: |
+          docker run --rm \
+            -v "$(pwd):/src" \
+            -e SEMGREP_APP_TOKEN="${{ secrets.SEMGREP_APP_TOKEN }}" \
+            semgrep/semgrep \
+            semgrep scan \
+            --config=auto \
+            --sarif \
+            --output=/src/semgrep-results.sarif \
+            /src/${{ env.SERVICE_PATH }}
+
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep-results.sarif
+
+  sonar-quality:
+    name: Static Application Security Testing (SonarQube)
+    runs-on: ubuntu-latest
+    env:
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube analysis (sonar-scanner)
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SERVICE_PATH: ${{ env.SERVICE_PATH }}
+          SONAR_ORG: ${{ secrets.SONAR_ORG }}
+          PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+        run: |
+          if [ -z "$SONAR_HOST_URL" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_ORG" ]; then
+            echo "Missing SONAR_HOST_URL, SONAR_TOKEN or SONAR_ORG secrets" >&2
+            exit 1
+          fi
+
+          docker run --rm \
+            -v "$(pwd):/usr/src" \
+            -e SONAR_HOST_URL="$SONAR_HOST_URL" \
+            -e SONAR_TOKEN="$SONAR_TOKEN" \
+            sonarsource/sonar-scanner-cli \
+            -Dsonar.projectKey="$PROJECT_KEY" \
+            -Dsonar.sources="$SERVICE_PATH" \
+            -Dsonar.organization="$SONAR_ORG"
+
+      - name: Check SonarQube Quality Gate
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORG: ${{ secrets.SONAR_ORG }}
+          PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+        run: |
+          if [ -z "$SONAR_HOST_URL" ] || [ -z "$SONAR_TOKEN" ]; then
+            echo "Missing SONAR_HOST_URL or SONAR_TOKEN secrets" >&2
+            exit 1
+          fi
+
+          resp=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=$PROJECT_KEY")
+          echo "$resp" > sonar-quality.json
+          status=$(echo "$resp" | python3 -c 'import sys, json; print(json.loads(sys.stdin.read()).get("projectStatus",{}).get("status","UNKNOWN"))')
+          echo "Sonar Quality Gate status: $status"
+          if [ "$status" != "OK" ]; then
+            echo "Quality Gate failed" >&2
+            exit 1
+          fi
+
+  sca-scan:
+    name: Software Composition Analysis (Trivy filesystem)
+    runs-on: ubuntu-latest
+    env:
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Trivy SCA filesystem scan (SARIF)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-targets: ${{ env.SERVICE_PATH }}
+          format: sarif
+          output: trivy-sca-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+          ignore-unfixed: true
+
+      - name: Trivy JSON scan (for gating)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-targets: ${{ env.SERVICE_PATH }}
+          format: json
+          output: trivy-sca-results.json
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+          ignore-unfixed: true
+
+      - name: Fail on CRITICAL/HIGH vulnerabilities without fix
+        run: |
+          python3 << 'EOF'
+          import json,sys
+          try:
+              data = json.load(open('trivy-sca-results.json'))
+          except Exception as e:
+              print('Could not read trivy-sca-results.json:', e)
+              sys.exit(1)
+          
+          found = False
+          for result in data.get('Results', []):
+              for vuln in result.get('Vulnerabilities', []) or []:
+                  sev = vuln.get('Severity', '').upper()
+                  if sev in ('CRITICAL','HIGH'):
+                      fixed = vuln.get('FixedVersion') or ''
+                      if not fixed.strip():
+                          print(f"BLOCKING: {vuln.get('VulnerabilityID')} {vuln.get('PkgName')} {sev} (no fix)")
+                          found = True
+          
+          if found:
+              sys.exit(1)
+          else:
+              print('No blocking unpatched CRITICAL/HIGH vulnerabilities found')
+          EOF
+
+      - name: Upload Trivy SCA SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-sca-results.sarif
+
+  secret-scan:
+    name: Secret Scan (GitLeaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Run GitLeaks
+        run: |
+          docker run --rm \
+            -v "$(pwd):/repo" \
+            -w /repo \
+            zricethezav/gitleaks:latest detect \
+              --source /repo \
+              --report-format sarif \
+              --report-path /repo/gitleaks-results.sarif \
+              --verbose \
+              --exit-code 1
+
+      - name: Upload GitLeaks SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: gitleaks-results.sarif
+  
+  functional-tests:
+    name: Functional API Tests (Newman)
+    runs-on: ubuntu-latest
+    needs: [sonar-quality, sca-scan, secret-scan]
+    env:
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+      SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Check if tests exist
+        id: check
+        run: |
+          if [ -f "${{ env.SERVICE_PATH }}/tests/postman_collection.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No tests found for ${{ env.SERVICE_NAME }}, skipping"
+          fi
+
+      - name: Start service
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          docker compose -f ${{ env.SERVICE_PATH }}/tests/docker-compose.test.yml up -d --build
+
+          echo "Esperando que el servicio esté listo..."
+          for i in $(seq 1 24); do
+            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Servicio listo después de $((i * 5))s"
+              break
+            fi
+            echo "Intento $i/24 — esperando 5s..."
+            sleep 5
+            if [ $i -eq 24 ]; then
+              echo "Timeout: el servicio no levantó en 2 minutos"
+              docker compose -f ${{ env.SERVICE_PATH }}/tests/docker-compose.test.yml logs
+              exit 1
+            fi
+          done
+
+      - name: Run Newman
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          docker run --rm \
+            --network host \
+            -v "$(pwd)/${{ env.SERVICE_PATH }}/tests:/etc/newman" \
+            postman/newman:latest \
+            run /etc/newman/postman_collection.json \
+            --environment /etc/newman/postman_environment.json \
+            --reporters cli,junit \
+            --reporter-junit-export /etc/newman/newman-results.xml
+
+      - name: Upload results
+        if: always() && steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-${{ env.SERVICE_NAME }}
+          path: ${{ env.SERVICE_PATH }}/tests/newman-results.xml
+
+      - name: Teardown
+        if: always() && steps.check.outputs.exists == 'true'
+        run: docker compose -f ${{ env.SERVICE_PATH }}/tests/docker-compose.test.yml down
+
+  build-and-push:
+    name: Build & Push Service Image to ECR
+    runs-on: ubuntu-latest
+    needs: [sonar-quality, sca-scan, secret-scan, functional-tests]
+    env:
+      AWS_REGION: us-east-1
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+      SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
+    outputs:
+      image_uri: ${{ steps.build.outputs.image_uri }}
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Determinar entorno
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_name }}" = "test" ]; then
+            echo "environment=test" >> $GITHUB_OUTPUT
+          else
+            echo "environment=develop" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Derivar nombre de servicio (si no provisto)
+        if: ${{ !inputs.service_name && !github.event.inputs.service_name }}
+        run: |
+          basename=$(basename "${{ env.SERVICE_PATH }}")
+          echo "SERVICE_NAME=$basename" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag y push de imagen
+        id: build
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ENV: ${{ steps.set-env.outputs.environment }}
+          ECR_REPO: ${{ env.SERVICE_NAME }}-service-${{ steps.set-env.outputs.environment }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_URI="$REGISTRY/$ECR_REPO:$IMAGE_TAG"
+
+          docker build \
+            --label "git.sha=${{ github.sha }}" \
+            --label "git.branch=${{ github.ref_name }}" \
+            --label "build.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t "$IMAGE_URI" \
+            -t "$REGISTRY/$ECR_REPO:latest" \
+            ${{ env.SERVICE_PATH }}
+
+          docker push "$IMAGE_URI"
+          docker push "$REGISTRY/$ECR_REPO:latest"
+
+          echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+  image-scan:
+    name: Image Scan (Trivy)
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    env:
+      AWS_REGION: us-east-1
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+      SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build-and-push.outputs.image_uri }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  deploy:
+    name: Deploy Service to ECS
+    runs-on: ubuntu-latest
+    needs: [build-and-push, image-scan]
+    env:
+      AWS_REGION: us-east-1
+      SERVICE_PATH: ${{ inputs.service_path || github.event.inputs.service_path || 'src/admin' }}
+      SERVICE_NAME: ${{ inputs.service_name || github.event.inputs.service_name || 'admin' }}
+    environment:
+      name: ${{ needs.build-and-push.outputs.environment }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy nueva imagen en ECS
+        env:
+          ENV: ${{ needs.build-and-push.outputs.environment }}
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image_uri }}
+          ECS_CLUSTER: ecs-cluster-${{ needs.build-and-push.outputs.environment }}
+          ECS_SERVICE: ${{ env.SERVICE_NAME }}-service-${{ needs.build-and-push.outputs.environment }}
+          ECS_TASK_FAMILY: ${{ env.SERVICE_NAME }}-service-${{ needs.build-and-push.outputs.environment }}
+          CONTAINER_NAME: ${{ env.SERVICE_NAME }}-service
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment

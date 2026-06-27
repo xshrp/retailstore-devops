@@ -1,119 +1,126 @@
-name: Test Dispatcher
+name: pipeline-dispatcher - Invoke Service Pipeline
+
+permissions:
+  security-events: write
+  contents: read
+  id-token: write
+  issues: write           
+  pull-requests: write
 
 on:
+  push:
+    branches:
+      - main
+      - develop
+      - admin
+      - cart
+      - catalog
+      - checkout
+      - orders
+      - ui
+    paths: ['src/**', '.github/workflows/**']
+
+  pull_request:
+    branches: ["main", "develop"]
+    paths: ['src/**', '.github/workflows/**']
+
   workflow_dispatch:
     inputs:
+      service_name:
+        description: 'Servicio específico (vacío = todos)'
+        required: false
+        type: choice
+        options:
+          - ""
+          - admin
+          - cart
+          - catalog
+          - checkout
+          - orders
+          - ui
+
       environment:
-        description: "Seleccione entorno (TODO : Cambiar a branch)"
+        description: 'Ambiente a desplegar'
         required: true
         type: choice
         options:
           - develop
           - test
           - prod
-        default: develop
 
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  ENVIRONMENT: ${{ github.event.inputs.environment }}
-  ECS_CLUSTER: retailstore-${{ github.event.inputs.environment }}
-  ECR_PREFIX: retailstore-${{ github.event.inputs.environment }}
 
 jobs:
-  terraform:
+  resolve-matrix:
     runs-on: ubuntu-latest
-
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configuracion de credenciales de AWS
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Instalacion de Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform Init
+      - id: set-matrix
         run: |
-          cd infra/environments/${{ github.event.inputs.environment }}
-          terraform init
+          INPUT="${{ github.event.inputs.service_name }}"
+          BRANCH="${GITHUB_REF#refs/heads/}"
 
-      - name: Terraform Apply
-        env:
-          TF_VAR_postgres_user: ${{ secrets.POSTGRES_USER }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
-          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
-          TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
-        run: |
-          cd infra/environments/${{ github.event.inputs.environment }}
-          terraform apply -auto-approve
+          # Si hay input, solo ese servicio
+          if [ -n "$INPUT" ]; then
+            MATRIX=$(echo '[{"service_name":"'$INPUT'","service_path":"src/'$INPUT'"}]')
 
-  deploy:
-    needs: terraform
+          # Si la rama coincide con un servicio, usar ese servicio
+          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "cart" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
+            MATRIX=$(echo '[{"service_name":"'$BRANCH'","service_path":"src/'$BRANCH'"}]')
+
+          else
+            MATRIX='[
+              {"service_name":"admin",    "service_path":"src/admin"},
+              {"service_name":"cart",     "service_path":"src/cart"},
+              {"service_name":"catalog",  "service_path":"src/catalog"},
+              {"service_name":"checkout", "service_path":"src/checkout"},
+              {"service_name":"orders",   "service_path":"src/orders"},
+              {"service_name":"ui",       "service_path":"src/ui"}
+            ]'
+          fi
+
+          # Compactar y exportar como output
+          echo "matrix=$(echo $MATRIX | jq -c .)" >> $GITHUB_OUTPUT
+
+  call-service:
+    name: LLamar Pipeline de Servicio
+    needs: resolve-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.resolve-matrix.outputs.matrix) }}
+
+    uses: ./.github/workflows/services_pipeline.yml
+    with:
+      service_path: ${{ matrix.service_path }}
+      service_name: ${{ matrix.service_name }}
+    secrets: inherit
+
+  configure-infra:
+    name: Configurar Infraestructura
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configuracion de credenciales de AWS
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Login a Amazon ECR
+      - name: Verifica environment seleccionado
         run: |
-          set -e
+          ENV="${{ inputs.environment }}"
+          echo "Environment seleccionado: $ENV"
 
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ECR_REGISTRY=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          case "$ENV" in
+            develop|test|prod)
+              echo "TFVARS_FILE=terraform/envs/${ENV}.tfvars" >> $GITHUB_ENV
+              echo "Using tfvars: terraform/envs/${ENV}.tfvars"
+              ;;
+            *)
+              echo "Invalid environment: $ENV. Debe ser develop, test o prod" >&2
+              exit 1
+              ;;
+          esac
 
-          aws ecr get-login-password --region $AWS_REGION \
-            | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-      - name: Construccion y push de imagenes
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ECR_REGISTRY=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-
-          declare -A CONTEXTS=(
-            [catalog]=./src/catalog
-            [carts]=./src/cart
-            [orders]=./src/orders
-            [checkout]=./src/checkout
-            [ui]=./src/ui
-            [admin]=./src/admin
-          )
-
-          SERVICES=(catalog carts orders checkout ui admin)
-
-          for service in "${SERVICES[@]}"
-          do
-            echo "Servicio (build): $service"
-            docker build -t $service "${CONTEXTS[$service]}"
-            docker tag $service:latest $ECR_REGISTRY/retailstore-${{ github.event.inputs.environment }}/$service:latest
-            docker push $ECR_REGISTRY/retailstore-${{ github.event.inputs.environment }}/$service:latest
-          done
-
-      - name: Despliegue de ECS services
-        run: |
-          SERVICES=(catalog carts orders checkout ui admin)
-          
-          for service in "${SERVICES[@]}"
-          do
-            echo "Desplegando: $service"
-
-            aws ecs update-service \
-              --cluster $ECS_CLUSTER \
-              --service $service \
-              --force-new-deployment
-          done
+  call-infra:
+    name: Pipeline de Infraestructura
+    if: github.event_name == 'workflow_dispatch'
+    needs: call-service
+    uses: ./.github/workflows/infra_pipeline.yml
+    with:
+      environment: ${{ inputs.environment }}  
+    secrets: inherit

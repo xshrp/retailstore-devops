@@ -1,0 +1,40 @@
+{
+  "info": { "name": "Cart API", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": { "method": "GET", "url": "{{base_url}}/health" },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+        "pm.test('Status UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+      ]}}]
+    },
+    {
+      "name": "Get Cart (empty)",
+      "request": { "method": "GET", "url": "{{base_url}}/carts/customer-123" },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status 200', () => pm.response.to.have.status(200));"
+      ]}}]
+    },
+    {
+      "name": "Add Item to Cart",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/carts/customer-123/items",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"itemId\":\"item-1\",\"quantity\":2,\"unitPrice\":1500}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status 201', () => pm.response.to.have.status(201));"
+      ]}}]
+    },
+    {
+      "name": "Get Cart Items",
+      "request": { "method": "GET", "url": "{{base_url}}/carts/customer-123/items" },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+        "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+      ]}}]
+    }
+  ]
+}
