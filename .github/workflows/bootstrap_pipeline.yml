@@ -39,11 +39,6 @@ jobs:
           aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Obtener Lambda Role ARN
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "LAMBDA_ROLE=arn:aws:iam::${ACCOUNT_ID}:role/LabRole" >> $GITHUB_ENV
-
       - name: Empaquetar Lambda notifier
         run: |
           cd ${{ github.workspace }}/infra/lambda/alarm_notifier
@@ -77,19 +72,21 @@ jobs:
 
       - name: Terraform Apply — solo ECR, red y cluster
         run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          LAMBDA_ROLE="arn:aws:iam::${ACCOUNT_ID}:role/LabRole"
           terraform apply -auto-approve \
             -target=module.app.module.networking \
             -target=module.app.module.ecr \
             -target=module.app.module.ecs \
             -target=module.app.module.alb \
-            -target=module.app.module.internal_lb
+            -target=module.app.module.internal_lb \
+            -var="lambda_role_arn=${LAMBDA_ROLE}"
         env:
           TF_VAR_postgres_user:    ${{ secrets.POSTGRES_USER }}
           TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
           TF_VAR_admin_username:   ${{ secrets.ADMIN_USERNAME }}
           TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
-          TF_VAR_lambda_role_arn:  ${{ env.LAMBDA_ROLE }}
 
   build-and-push:
     name: "2/3 Build & Push imágenes a ECR"
@@ -179,20 +176,18 @@ jobs:
           aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Obtener Lambda Role ARN    # ← NUEVO
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "LAMBDA_ROLE=arn:aws:iam::${ACCOUNT_ID}:role/LabRole" >> $GITHUB_ENV
-
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Apply — completo
-        run: terraform apply -auto-approve
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          LAMBDA_ROLE="arn:aws:iam::${ACCOUNT_ID}:role/LabRole"
+          terraform apply -auto-approve \
+            -var="lambda_role_arn=${LAMBDA_ROLE}"
         env:
           TF_VAR_postgres_user:    ${{ secrets.POSTGRES_USER }}
           TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
           TF_VAR_admin_username:   ${{ secrets.ADMIN_USERNAME }}
           TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
-          TF_VAR_lambda_role_arn:  ${{ env.LAMBDA_ROLE }}

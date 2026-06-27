@@ -19,5 +19,4 @@ private_subnets = [
 
 alarm_email = "" 
 
-lambda_role_arn = ""
 webhook_url     = "" 
