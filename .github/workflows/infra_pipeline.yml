@@ -36,10 +36,11 @@ jobs:
           aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Obtener Lambda Role ARN 
+      - name: Empaquetar Lambda notifier
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "LAMBDA_ROLE=arn:aws:iam::${ACCOUNT_ID}:role/LabRole" >> $GITHUB_ENV
+          cd ${{ github.workspace }}/infra/lambda/alarm_notifier
+          zip -j lambda_notifier.zip index.js
+          cp lambda_notifier.zip ${{ github.workspace }}/infra/modules/cloudwatch/lambda_notifier.zip
 
       - name: Terraform Init
         run: terraform init
@@ -49,7 +50,10 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -out=tfplan  
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          LAMBDA_ROLE="arn:aws:iam::${ACCOUNT_ID}:role/LabRole"
+          terraform plan -out=tfplan -var="lambda_role_arn=${LAMBDA_ROLE}"
         continue-on-error: true
         env:
           TF_VAR_postgres_user:    ${{ secrets.POSTGRES_USER }}
