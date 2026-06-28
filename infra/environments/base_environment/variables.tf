@@ -51,3 +51,19 @@ variable "admin_jwt_secret" {
   type      = string
   sensitive = true
 }
+
+variable "alarm_email" {
+  description = "Email para notificaciones de alarmas"
+  type        = string
+  default     = ""
+}
+
+variable "lambda_role_arn" {
+  description = "ARN del LabRole para Lambda"
+  type        = string
+}
+
+variable "webhook_url" {
+  type    = string
+  default = ""
+}

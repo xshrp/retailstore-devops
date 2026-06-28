@@ -35,4 +35,8 @@ module "app" {
   admin_username   = var.admin_username
   admin_password   = var.admin_password
   admin_jwt_secret = var.admin_jwt_secret
+
+  alarm_email     = var.alarm_email      
+  lambda_role_arn = var.lambda_role_arn  
+  webhook_url     = var.webhook_url
 }

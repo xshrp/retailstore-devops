@@ -28,6 +28,20 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Empaquetar Lambda notifier
+        run: |
+          cd ${{ github.workspace }}/infra/lambda/alarm_notifier
+          zip -j lambda_notifier.zip index.js
+          cp lambda_notifier.zip ${{ github.workspace }}/infra/modules/cloudwatch/lambda_notifier.zip
+
       - name: Terraform Init
         run: terraform init
 
@@ -36,7 +50,10 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -out=tfplan  
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          LAMBDA_ROLE="arn:aws:iam::${ACCOUNT_ID}:role/LabRole"
+          terraform plan -out=tfplan -var="lambda_role_arn=${LAMBDA_ROLE}"
         continue-on-error: true
         env:
           TF_VAR_postgres_user:    ${{ secrets.POSTGRES_USER }}
@@ -44,6 +61,7 @@ jobs:
           TF_VAR_admin_username:   ${{ secrets.ADMIN_USERNAME }}
           TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
+          TF_VAR_lambda_role_arn:  ${{ env.LAMBDA_ROLE }}
 
       - name: Comment plan on PR
         if: github.event_name == 'pull_request'
@@ -75,3 +93,4 @@ jobs:
           TF_VAR_admin_username:   ${{ secrets.ADMIN_USERNAME }}
           TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
+          TF_VAR_lambda_role_arn:  ${{ env.LAMBDA_ROLE }}

@@ -13,7 +13,7 @@ on:
       - main
       - develop
       - admin
-      - cart
+      - carts
       - catalog
       - checkout
       - orders
@@ -33,7 +33,7 @@ on:
         options:
           - ""
           - admin
-          - cart
+          - carts
           - catalog
           - checkout
           - orders
@@ -65,13 +65,13 @@ jobs:
             MATRIX=$(echo '[{"service_name":"'$INPUT'","service_path":"src/'$INPUT'"}]')
 
           # Si la rama coincide con un servicio, usar ese servicio
-          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "cart" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
+          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "carts" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
             MATRIX=$(echo '[{"service_name":"'$BRANCH'","service_path":"src/'$BRANCH'"}]')
 
           else
             MATRIX='[
               {"service_name":"admin",    "service_path":"src/admin"},
-              {"service_name":"cart",     "service_path":"src/cart"},
+              {"service_name":"carts",     "service_path":"src/cart"},
               {"service_name":"catalog",  "service_path":"src/catalog"},
               {"service_name":"checkout", "service_path":"src/checkout"},
               {"service_name":"orders",   "service_path":"src/orders"},
@@ -96,30 +96,10 @@ jobs:
       service_name: ${{ matrix.service_name }}
     secrets: inherit
 
-  configure-infra:
-    name: Configurar Infraestructura
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verifica environment seleccionado
-        run: |
-          ENV="${{ inputs.environment }}"
-          echo "Environment seleccionado: $ENV"
-
-          case "$ENV" in
-            develop|test|prod)
-              echo "TFVARS_FILE=terraform/envs/${ENV}.tfvars" >> $GITHUB_ENV
-              echo "Using tfvars: terraform/envs/${ENV}.tfvars"
-              ;;
-            *)
-              echo "Invalid environment: $ENV. Debe ser develop, test o prod" >&2
-              exit 1
-              ;;
-          esac
-
   call-infra:
     name: Pipeline de Infraestructura
-    if: github.event_name == 'workflow_dispatch'
     needs: call-service
+    if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/infra_pipeline.yml
     with:
       environment: ${{ inputs.environment }}  

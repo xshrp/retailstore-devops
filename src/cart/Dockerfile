@@ -1,7 +1,7 @@
 FROM python:3.12-alpine AS builder
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install --only-binary :all: -r requirements.txt
 
 
 FROM python:3.12-alpine AS production

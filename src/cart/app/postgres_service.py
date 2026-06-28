@@ -7,6 +7,10 @@ from app.config import settings
 
 class PostgresCartService(CartService):
     def __init__(self):
+        self._conn = None
+        self._connect()
+
+    def _connect(self):
         self._conn = psycopg2.connect(
             host=settings.postgres_host,
             port=settings.postgres_port,
@@ -16,11 +20,18 @@ class PostgresCartService(CartService):
         )
         self._conn.autocommit = True
 
+    def _get_conn(self):
+        try:
+            self._conn.cursor().execute("SELECT 1")
+        except Exception:
+            self._connect()
+        return self._conn
+
     def get(self, customer_id: str) -> Cart:
         return Cart(customerId=customer_id, items=self.get_items(customer_id))
 
     def delete(self, customer_id: str) -> None:
-        with self._conn.cursor() as cur:
+        with self._get_conn().cursor() as cur:
             cur.execute("DELETE FROM cart_items WHERE customer_id = %s", (customer_id,))
 
     def merge(self, customer_id: str, session_id: str) -> None:
@@ -29,7 +40,7 @@ class PostgresCartService(CartService):
         self.delete(session_id)
 
     def get_items(self, customer_id: str) -> list[Item]:
-        with self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with self._get_conn().cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 "SELECT item_id, quantity, unit_price FROM cart_items WHERE customer_id = %s",
                 (customer_id,),
@@ -40,7 +51,7 @@ class PostgresCartService(CartService):
             ]
 
     def add_item(self, customer_id: str, item: Item) -> Item:
-        with self._conn.cursor() as cur:
+        with self._get_conn().cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO cart_items (customer_id, item_id, quantity, unit_price)
@@ -53,7 +64,7 @@ class PostgresCartService(CartService):
         return item
 
     def update_item(self, customer_id: str, item: Item) -> Item | None:
-        with self._conn.cursor() as cur:
+        with self._get_conn().cursor() as cur:
             cur.execute(
                 """
                 UPDATE cart_items SET quantity = %s, unit_price = %s
@@ -64,7 +75,7 @@ class PostgresCartService(CartService):
             return item if cur.rowcount > 0 else None
 
     def get_item(self, customer_id: str, item_id: str) -> Item | None:
-        with self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with self._get_conn().cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 "SELECT item_id, quantity, unit_price FROM cart_items WHERE customer_id = %s AND item_id = %s",
                 (customer_id, item_id),
@@ -73,7 +84,7 @@ class PostgresCartService(CartService):
             return Item(itemId=r["item_id"], quantity=r["quantity"], unitPrice=r["unit_price"]) if r else None
 
     def delete_item(self, customer_id: str, item_id: str) -> None:
-        with self._conn.cursor() as cur:
+        with self._get_conn().cursor() as cur:
             cur.execute(
                 "DELETE FROM cart_items WHERE customer_id = %s AND item_id = %s",
                 (customer_id, item_id),

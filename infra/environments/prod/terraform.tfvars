@@ -16,3 +16,7 @@ private_subnets = [
   "10.0.3.0/24",
   "10.0.4.0/24"
 ]
+
+alarm_email = "josema.m.a1930@gmail.com"  
+
+webhook_url     = "" 

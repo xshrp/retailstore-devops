@@ -11,7 +11,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package*.json ./
-RUN npm install --only=production
+RUN npm install --only=production --ignore-scripts
 ENV PORT=8080
 EXPOSE 8080
 USER appuser 
