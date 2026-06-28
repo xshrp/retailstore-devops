@@ -13,7 +13,7 @@ on:
       - main
       - develop
       - admin
-      - cart
+      - carts
       - catalog
       - checkout
       - orders
@@ -33,7 +33,7 @@ on:
         options:
           - ""
           - admin
-          - cart
+          - carts
           - catalog
           - checkout
           - orders
@@ -65,13 +65,13 @@ jobs:
             MATRIX=$(echo '[{"service_name":"'$INPUT'","service_path":"src/'$INPUT'"}]')
 
           # Si la rama coincide con un servicio, usar ese servicio
-          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "cart" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
+          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "carts" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
             MATRIX=$(echo '[{"service_name":"'$BRANCH'","service_path":"src/'$BRANCH'"}]')
 
           else
             MATRIX='[
               {"service_name":"admin",    "service_path":"src/admin"},
-              {"service_name":"cart",     "service_path":"src/cart"},
+              {"service_name":"carts",     "service_path":"src/cart"},
               {"service_name":"catalog",  "service_path":"src/catalog"},
               {"service_name":"checkout", "service_path":"src/checkout"},
               {"service_name":"orders",   "service_path":"src/orders"},
