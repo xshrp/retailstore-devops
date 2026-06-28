@@ -1,169 +1,106 @@
-# Retail Store - Sample App
+# Despliegue
 
-Aplicación de e-commerce basada en microservicios. Permite explorar un catálogo de productos, gestionar un carrito de compras, realizar el checkout y consultar órdenes. Incluye un panel de administración para gestionar productos y ver órdenes.
+## Pre-requisitos
 
-## Requisitos previos
+Antes de ejecutar los workflows es necesario contar con:
 
-- [Docker](https://docs.docker.com/get-docker/) 24+
-- [Docker Compose](https://docs.docker.com/compose/install/) v2.20+
-
-## Inicio rápido
-
-```bash
-docker compose up --build
-```
-
-| Servicio | URL                   |
-|----------|-----------------------|
-| Tienda   | http://localhost:8080 |
-| Admin    | http://localhost:8081 |
-
-Credenciales del admin por defecto: `admin` / `admin`
-
-## Comandos útiles
-
-```bash
-# Detener los servicios
-docker compose down
-
-# Detener y eliminar volúmenes (resetear base de datos)
-docker compose down -v
-
-# Reconstruir un servicio específico
-docker compose up --build <servicio>
-
-# Ver logs de un servicio
-docker compose logs -f <servicio>
-```
-
----
-
-## Arquitectura de microservicios
-
-```
-          ┌──────────────────────────────────────────────────┐
-          │               Usuario / Navegador                │
-          └────────────────────────┬─────────────────────────┘
-                                   │ HTTP
-          ┌────────────────────────▼─────────────────────────┐
-          │                   UI  :8080                      │
-          │            Node.js 22 / Express                  │
-          └───────┬──────────┬──────────┬────────────┬───────┘
-                  │          │          │            │  HTTP (proxy)
-        ┌─────────▼────┐ ┌───▼─────┐ ┌──▼────────┐ ┌▼──────────┐
-        │   Catalog    │ │  Cart   │ │ Checkout  │ │  Orders   │
-        │    :8080     │ │  :8080  │ │  :8080    │ │  :8080    │
-        │  Go / Gin    │ │ Python  │ │ NestJS/TS │ │ Go / Gin  │
-        └──────┬───────┘ └────┬────┘ └─────┬─────┘ └─────┬─────┘
-               │              │            │  HTTP        │
-               │              │            └─────────────►│
-               │              │     ┌───────────────┐     │
-               │              │     │    Redis 7    │◄────┤
-               │              │     └───────────────┘     │
-               └──────────────┴───────────────────────────┘
-                                          │
-        ┌─────────────────────────────────▼──────────────────────┐
-        │                      PostgreSQL 16                     │
-        │          catalogdb     │    cartdb    │    orders      │
-        └────────────────────────────────────────────────────────┘
-
-          ┌──────────────────────────────────────────────────┐
-          │                  Admin  :8081                    │
-          │            Node.js 22 / Express                  │
-          └────────────────────────┬─────────────────────────┘
-                                   │ SQL directo
-          ┌────────────────────────▼─────────────────────────┐
-          │                  PostgreSQL 16                   │
-          └──────────────────────────────────────────────────┘
-```
-
-### Flujo de comunicación
-
-| Origen     | Destino    | Protocolo | Descripción                              |
-|------------|------------|-----------|------------------------------------------|
-| UI         | Catalog    | HTTP REST | Listar y consultar productos             |
-| UI         | Cart       | HTTP REST | Agregar, quitar y consultar carrito      |
-| UI         | Checkout   | HTTP REST | Iniciar y confirmar el proceso de pago   |
-| UI         | Orders     | HTTP REST | Consultar historial de órdenes           |
-| Checkout   | Orders     | HTTP REST | Crear orden al confirmar checkout        |
-| Checkout   | Redis      | TCP       | Persistencia de sesión de checkout       |
-| Catalog    | PostgreSQL | TCP       | Base de datos `catalogdb`                |
-| Cart       | PostgreSQL | TCP       | Base de datos `cartdb`                   |
-| Orders     | PostgreSQL | TCP       | Base de datos `orders`                   |
-| Admin      | PostgreSQL | TCP       | Acceso directo a todas las bases         |
-
----
-
-## Tecnologías por servicio
-
-| Servicio     | Lenguaje       | Framework        | Runtime         | Persistencia      | Puerto externo |
-|--------------|----------------|------------------|-----------------|-------------------|----------------|
-| **ui**       | TypeScript     | Express          | Node.js 22      | —                 | 8080           |
-| **catalog**  | Go 1.24        | Gin + GORM       | Alpine Linux    | PostgreSQL        | —              |
-| **cart**     | Python 3.12    | FastAPI          | Python slim     | PostgreSQL        | —              |
-| **checkout** | TypeScript     | NestJS           | Node.js 22      | Redis             | —              |
-| **orders**   | Go 1.24        | Gin + GORM       | Alpine Linux    | PostgreSQL        | —              |
-| **admin**    | TypeScript     | Express          | Node.js 22      | PostgreSQL        | 8081           |
-| **db**       | —              | PostgreSQL 16    | —               | —                 | —              |
-| **redis**    | —              | Redis 7          | Alpine Linux    | —                 | —              |
-
-### Dependencias clave
-
-| Servicio     | Dependencias destacadas                                               |
-|--------------|-----------------------------------------------------------------------|
-| **catalog**  | `gin-gonic/gin`, `gorm`, `go-gorm/postgres`, OpenTelemetry           |
-| **cart**     | `FastAPI`, `Uvicorn`, `Pydantic`, `psycopg2`, Prometheus client       |
-| **checkout** | `NestJS`, `ioredis`, `class-validator`, OpenTelemetry                 |
-| **orders**   | `gin-gonic/gin`, `gorm`, `go-gorm/postgres`, Prometheus              |
-| **ui**       | `express`, `http-proxy-middleware`                                    |
-| **admin**    | `express`, `pg`, `jsonwebtoken`, `cookie-parser`                      |
+- Una cuenta activa de AWS Academy.
+- Permisos para ejecutar GitHub Actions en el repositorio.
+- Los GitHub Repository Secrets configurados.
+- Seleccionar el ambiente correspondiente (`develop`, `test` o `prod`).
 
 ---
 
 ## Variables de entorno
 
-### UI
-| Variable                        | Descripción                  | Default               |
-|---------------------------------|------------------------------|-----------------------|
-| `RETAIL_UI_ENDPOINTS_CATALOG`   | URL del servicio catalog     | `http://catalog:8080` |
-| `RETAIL_UI_ENDPOINTS_CARTS`     | URL del servicio cart        | `http://carts:8080`   |
-| `RETAIL_UI_ENDPOINTS_CHECKOUT`  | URL del servicio checkout    | `http://checkout:8080`|
-| `RETAIL_UI_ENDPOINTS_ORDERS`    | URL del servicio orders      | `http://orders:8080`  |
+Configurar los siguientes **GitHub Repository Secrets**:
 
-### Catalog / Orders / Cart
-| Variable                               | Descripción           | Default          |
-|----------------------------------------|-----------------------|------------------|
-| `RETAIL_CATALOG_PERSISTENCE_PROVIDER`  | Tipo de persistencia  | `postgres`       |
-| `RETAIL_CATALOG_PERSISTENCE_ENDPOINT`  | Host:Puerto de la DB  | `db:5432`        |
-| `DB_PASSWORD`                          | Contraseña PostgreSQL | `retailpassword` |
+### AWS
 
-### Checkout
-| Variable                                   | Descripción              | Default               |
-|--------------------------------------------|--------------------------|------------------------|
-| `RETAIL_CHECKOUT_PERSISTENCE_PROVIDER`     | Tipo de persistencia     | `redis`               |
-| `RETAIL_CHECKOUT_PERSISTENCE_REDIS_URL`    | URL de Redis             | `redis://redis:6379`  |
-| `RETAIL_CHECKOUT_ENDPOINTS_ORDERS`         | URL del servicio orders  | `http://orders:8080`  |
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN`
+- `AWS_REGION`
 
-### Admin
-| Variable            | Descripción                | Default                   |
-|---------------------|----------------------------|---------------------------|
-| `ADMIN_USERNAME`    | Usuario administrador      | `admin`                   |
-| `ADMIN_PASSWORD`    | Contraseña administrador   | `admin`                   |
-| `ADMIN_JWT_SECRET`  | Secreto para tokens JWT    | `change-me-in-production` |
+### Base de datos
+
+- `POSTGRES_USER`
+- `DB_PASSWORD`
+
+### Administración
+
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `ADMIN_JWT_SECRET`
+
+### SonarQube
+
+- `SONAR_HOST_URL`
+- `SONAR_ORG`
+- `SONAR_PROJECT_KEY`
+- `SONAR_TOKEN`
 
 ---
 
-## Estructura del repositorio
+## Instrucciones de despliegue
 
+### 1. Bootstrap Pipeline
+
+Este pipeline debe ejecutarse **una única vez por ambiente**, cuando la infraestructura se crea desde cero.
+
+Su función es resolver la dependencia entre Terraform y Amazon ECR mediante tres etapas:
+
+1. **Terraform Bootstrap:** crea la infraestructura base y los repositorios de Amazon ECR.
+2. **Build and Push:** construye y publica las imágenes Docker de todos los microservicios.
+3. **Terraform Full:** despliega la infraestructura restante utilizando las imágenes previamente publicadas.
+
+---
+### 2. Dispatcher Pipeline
+
+Una vez inicializado el ambiente, los despliegues se realizan mediante el **Dispatcher Pipeline**.
+
+Al ejecutarlo se debe seleccionar:
+
+- Ambiente (`develop`, `test` o `prod`).
+- Microservicio específico (`admin`, `cart`, `catalog`, `checkout`, `orders`, `ui`) o todos los servicios.
+
+El pipeline realiza automáticamente las siguientes tareas:
+
+- Determina los servicios a desplegar.
+- Ejecuta el Pipeline de Servicios para cada microservicio seleccionado.
+- Selecciona el archivo `.tfvars` correspondiente al ambiente.
+- Ejecuta el Pipeline de Infraestructura para aplicar los cambios con Terraform.
+
+---
+### 3. Pipeline de Servicios
+
+Para cada microservicio se ejecutan las siguientes etapas:
+
+1. Code Scan (Semgrep).
+2. SonarQube Quality Analysis.
+3. Software Composition Analysis (Trivy).
+4. Secret Scan (GitLeaks).
+5. Build and Push de la imagen Docker a Amazon ECR.
+6. Image Scan (Trivy).
+7. Despliegue del servicio en Amazon ECS.
+
+---
+## Flujo de despliegue
+
+### Primera ejecución
 ```
-app/
-├── docker-compose.yml
-├── init-db.sql
-└── src/
-    ├── catalog/        # Go - Catálogo de productos
-    ├── cart/           # Python - Carrito de compras
-    ├── checkout/       # TypeScript/NestJS - Proceso de pago
-    ├── orders/         # Go - Gestión de órdenes
-    ├── ui/             # TypeScript/Express - Frontend
-    └── admin/          # TypeScript/Express - Panel de administración
+Bootstrap Pipeline
+│
+├── Terraform Bootstrap
+├── Build and Push
+└── Terraform
+```
+# Despliegues posteriores
+```
+Dispatcher Pipeline
+│
+├── Selección del ambiente
+├── Selección del microservicio
+├── Pipeline de Servicios
+└── Pipeline de Infraestructura
 ```
