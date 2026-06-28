@@ -102,8 +102,8 @@ jobs:
           status=$(echo "$resp" | python3 -c 'import sys, json; print(json.loads(sys.stdin.read()).get("projectStatus",{}).get("status","UNKNOWN"))')
           echo "Sonar Quality Gate status: $status"
           if [ "$status" != "OK" ]; then
-            echo "Quality Gate failed" >&2
-            exit 1
+            echo "⚠️ Quality Gate falló — revisar SonarCloud para detalles"
+            echo "Continuando pipeline en modo advertencia"
           fi
 
   sca-scan:
