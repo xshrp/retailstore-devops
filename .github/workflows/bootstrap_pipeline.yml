@@ -29,20 +29,58 @@ jobs:
         working-directory: infra/environments/${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: hashicorp/setup-terraform@v3
+
+      - name: Configurar credenciales AWS   
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Empaquetar Lambda notifier
+        run: |
+          cd ${{ github.workspace }}/infra/lambda/alarm_notifier
+          zip -j lambda_notifier.zip index.js
+          cp lambda_notifier.zip ${{ github.workspace }}/infra/modules/cloudwatch/lambda_notifier.zip
+          echo "✅ Lambda empaquetada"
+
+      - name: Crear bucket S3 para Terraform state
+        run: |
+          BUCKET="devops-retail-gj-bucket"
+          REGION="${{ secrets.AWS_REGION }}"
+
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "✅ Bucket $BUCKET ya existe"
+          else
+            echo "▶ Creando bucket $BUCKET..."
+            aws s3api create-bucket \
+              --bucket "$BUCKET" \
+              --region "$REGION"
+
+            # Habilitar versionado (recomendado para tfstate)
+            aws s3api put-bucket-versioning \
+              --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+
+            echo "✅ Bucket creado con versionado habilitado"
+          fi
 
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Apply — solo ECR, red y cluster
         run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          LAMBDA_ROLE="arn:aws:iam::${ACCOUNT_ID}:role/LabRole"
           terraform apply -auto-approve \
             -target=module.app.module.networking \
             -target=module.app.module.ecr \
             -target=module.app.module.ecs \
             -target=module.app.module.alb \
-            -target=module.app.module.internal_lb
+            -target=module.app.module.internal_lb \
+            -var="lambda_role_arn=${LAMBDA_ROLE}"
         env:
           TF_VAR_postgres_user:    ${{ secrets.POSTGRES_USER }}
           TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}
@@ -94,6 +132,18 @@ jobs:
               "$ECR_REGISTRY/retailstore-${ENV}/$service:latest"
             echo "✅ $service pushed"
           done
+        
+      - name: Empaquetar Lambda notifier
+        run: |
+          cd infra/lambda/alarm_notifier
+          zip -j lambda_notifier.zip index.js
+          cp lambda_notifier.zip ../../modules/cloudwatch/lambda_notifier.zip
+
+      - name: Upload Lambda zip          
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-notifier
+          path: infra/modules/cloudwatch/lambda_notifier.zip
 
   terraform-full:
     name: "3/3 Terraform Full (ECS services + todo)"
@@ -112,11 +162,29 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
 
+      - name: Download Lambda zip       
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-notifier
+          path: infra/modules/cloudwatch/
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Apply — completo
-        run: terraform apply -auto-approve
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          LAMBDA_ROLE="arn:aws:iam::${ACCOUNT_ID}:role/LabRole"
+          terraform apply -auto-approve \
+            -var="lambda_role_arn=${LAMBDA_ROLE}"
         env:
           TF_VAR_postgres_user:    ${{ secrets.POSTGRES_USER }}
           TF_VAR_db_password:      ${{ secrets.DB_PASSWORD }}

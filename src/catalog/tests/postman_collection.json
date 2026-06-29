@@ -1,0 +1,30 @@
+{
+  "info": { "name": "Catalog API", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "item": [
+    {
+      "name": "Get Products",
+      "request": { "method": "GET", "url": "{{base_url}}/catalog/products" },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+        "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+        "pm.test('Has products', () => pm.expect(pm.response.json().length).to.be.above(0));"
+      ]}}]
+    },
+    {
+      "name": "Get Tags",
+      "request": { "method": "GET", "url": "{{base_url}}/catalog/tags" },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+        "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+      ]}}]
+    },
+    {
+      "name": "Get Catalog Size",
+      "request": { "method": "GET", "url": "{{base_url}}/catalog/size" },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status 200', () => pm.response.to.have.status(200));",
+        "pm.test('Has size field', () => pm.expect(pm.response.json()).to.have.property('size'));"
+      ]}}]
+    }
+  ]
+}

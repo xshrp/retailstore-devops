@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore curl auth with env vars in workflows"
+paths = [".github/workflows/.*"]
+regexes = ['''\$\w+''']

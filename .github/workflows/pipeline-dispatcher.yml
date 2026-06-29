@@ -1,6 +1,29 @@
-name: Test Dispatcher
+name: pipeline-dispatcher - Invoke Service Pipeline
+
+permissions:
+  security-events: write
+  contents: read
+  id-token: write
+  issues: write           
+  pull-requests: write
 
 on:
+  push:
+    branches:
+      - main
+      - develop
+      - admin
+      - carts
+      - catalog
+      - checkout
+      - orders
+      - ui
+    paths: ['src/**', '.github/workflows/**']
+
+  pull_request:
+    branches: ["main", "develop"]
+    paths: ['src/**', '.github/workflows/**']
+
   workflow_dispatch:
     inputs:
       service_name:
@@ -10,16 +33,21 @@ on:
         options:
           - ""
           - admin
-          - cart
+          - carts
           - catalog
           - checkout
           - orders
           - ui
 
-permissions:
-  security-events: write
-  contents: read
-  id-token: write
+      environment:
+        description: 'Ambiente a desplegar'
+        required: true
+        type: choice
+        options:
+          - develop
+          - test
+          - prod
+
 
 jobs:
   resolve-matrix:
@@ -37,13 +65,13 @@ jobs:
             MATRIX=$(echo '[{"service_name":"'$INPUT'","service_path":"src/'$INPUT'"}]')
 
           # Si la rama coincide con un servicio, usar ese servicio
-          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "cart" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
+          elif [ "$BRANCH" = "admin" ] || [ "$BRANCH" = "carts" ] || [ "$BRANCH" = "catalog" ] || [ "$BRANCH" = "checkout" ] || [ "$BRANCH" = "orders" ] || [ "$BRANCH" = "ui" ]; then
             MATRIX=$(echo '[{"service_name":"'$BRANCH'","service_path":"src/'$BRANCH'"}]')
 
           else
             MATRIX='[
               {"service_name":"admin",    "service_path":"src/admin"},
-              {"service_name":"cart",     "service_path":"src/cart"},
+              {"service_name":"carts",     "service_path":"src/cart"},
               {"service_name":"catalog",  "service_path":"src/catalog"},
               {"service_name":"checkout", "service_path":"src/checkout"},
               {"service_name":"orders",   "service_path":"src/orders"},
@@ -55,6 +83,7 @@ jobs:
           echo "matrix=$(echo $MATRIX | jq -c .)" >> $GITHUB_OUTPUT
 
   call-service:
+    name: LLamar Pipeline de Servicio
     needs: resolve-matrix
     strategy:
       fail-fast: false
@@ -65,4 +94,13 @@ jobs:
     with:
       service_path: ${{ matrix.service_path }}
       service_name: ${{ matrix.service_name }}
+    secrets: inherit
+
+  call-infra:
+    name: Pipeline de Infraestructura
+    needs: call-service
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/infra_pipeline.yml
+    with:
+      environment: ${{ inputs.environment }}  
     secrets: inherit
