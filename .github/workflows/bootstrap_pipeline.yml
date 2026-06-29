@@ -48,7 +48,7 @@ jobs:
 
       - name: Crear bucket S3 para Terraform state
         run: |
-          BUCKET="devops-retail-gj-bucket-TODO"
+          BUCKET="devops-retail-gj-bucket"
           REGION="${{ secrets.AWS_REGION }}"
 
           if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
